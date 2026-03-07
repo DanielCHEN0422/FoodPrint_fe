@@ -1,0 +1,42 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建输出
+.expo/
+dist/
+build/
+web-build/
+*.tsbuildinfo
+
+# 日志
+*.log
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 系统文件
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# 锁文件
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# 原生文件夹
+ios/
+android/
+
+# 生成的类型文件
+expo-env.d.ts
+
+# 配置文件
+*.config.js
+babel.config.js
+metro.config.js
