@@ -7,9 +7,9 @@
 - **Node.js**：建议 v18 或以上（[官网](https://nodejs.org/)）
 - **pnpm**：本项目使用 pnpm 管理依赖
 
-  ```bash
-  npm install -g pnpm
-  ```
+    ```bash
+    npm install -g pnpm
+    ```
 
 - **Expo Go**（真机调试）：在手机应用商店搜索「Expo Go」并安装
 
@@ -42,15 +42,15 @@ pnpm start
 
 ## 常用脚本
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm start` | 启动 Expo 开发服务器 |
-| `pnpm android` | 直接以 Android 模式启动 |
-| `pnpm ios` | 直接以 iOS 模式启动（仅 macOS） |
-| `pnpm web` | 以 Web 模式启动 |
-| `pnpm lint` | 运行 ESLint 检查 |
-| `pnpm lint:fix` | 自动修复可修复的 ESLint 问题 |
-| `pnpm format` | 使用 Prettier 格式化代码 |
+| 命令                | 说明                               |
+| ------------------- | ---------------------------------- |
+| `pnpm start`        | 启动 Expo 开发服务器               |
+| `pnpm android`      | 直接以 Android 模式启动            |
+| `pnpm ios`          | 直接以 iOS 模式启动（仅 macOS）    |
+| `pnpm web`          | 以 Web 模式启动                    |
+| `pnpm lint`         | 运行 ESLint 检查                   |
+| `pnpm lint:fix`     | 自动修复可修复的 ESLint 问题       |
+| `pnpm format`       | 使用 Prettier 格式化代码           |
 | `pnpm format:check` | 检查代码格式是否符合 Prettier 规则 |
 
 ## 项目结构概览

@@ -1,14 +1,13 @@
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { Provider as PaperProvider } from 'react-native-paper';
+import { StatusBar } from 'expo-status-bar'
+import { Provider as PaperProvider } from 'react-native-paper'
 
-import { AppNavigator } from './src/navigation/AppNavigator';
+import { AppNavigator } from './src/navigation/AppNavigator'
 
 export default function App() {
-  return (
-    <PaperProvider>
-      <AppNavigator />
-      <StatusBar style="auto" />
-    </PaperProvider>
-  );
+    return (
+        <PaperProvider>
+            <AppNavigator />
+            <StatusBar style="auto" />
+        </PaperProvider>
+    )
 }
