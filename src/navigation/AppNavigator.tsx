@@ -1,22 +1,22 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { useTheme } from 'react-native-paper'
 
+import { useAuth } from '../context/AuthContext'
+import { LoginScreen } from '../screens/LoginScreen'
+import { RegisterScreen } from '../screens/RegisterScreen'
 import { CommunityScreen } from '../screens/CommunityScreen'
 import { HomeScreen } from '../screens/HomeScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { RecordScreen } from '../screens/RecordScreen'
-
-export type RootTabParamList = {
-    Home: undefined
-    Record: undefined
-    Community: undefined
-    Profile: undefined
-}
+import type { AuthStackParamList, RootTabParamList } from './types'
 
 const Tab = createBottomTabNavigator<RootTabParamList>()
+const AuthStack = createNativeStackNavigator<AuthStackParamList>()
 
-export function AppNavigator() {
+function MainTabs() {
     const theme = useTheme()
     const { colors } = theme
 
@@ -95,3 +95,58 @@ export function AppNavigator() {
         </Tab.Navigator>
     )
 }
+
+function AuthNavigator() {
+    const theme = useTheme()
+    const { colors } = theme
+
+    return (
+        <AuthStack.Navigator
+            screenOptions={{
+                headerTitleAlign: 'center',
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.onSurface,
+                contentStyle: { backgroundColor: colors.background },
+            }}
+        >
+            <AuthStack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ title: '登录' }}
+            />
+            <AuthStack.Screen
+                name="Register"
+                component={RegisterScreen}
+                options={{ title: '注册' }}
+            />
+        </AuthStack.Navigator>
+    )
+}
+
+export function AppNavigator() {
+    const theme = useTheme()
+    const { isAuthenticated, isLoading } = useAuth()
+
+    if (isLoading) {
+        return (
+            <View
+                style={[
+                    styles.loadingContainer,
+                    { backgroundColor: theme.colors.background },
+                ]}
+            >
+                <ActivityIndicator color={theme.colors.primary} size="large" />
+            </View>
+        )
+    }
+
+    return isAuthenticated ? <MainTabs /> : <AuthNavigator />
+}
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
+    },
+})
