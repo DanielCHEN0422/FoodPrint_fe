@@ -40,6 +40,7 @@ export function AppNavigator() {
                 name="Home"
                 component={HomeScreen}
                 options={{
+                    headerShown: false,
                     tabBarLabel: 'Home',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
@@ -54,6 +55,7 @@ export function AppNavigator() {
                 name="Record"
                 component={RecordScreen}
                 options={{
+                    headerShown: false,
                     tabBarLabel: 'Record',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
