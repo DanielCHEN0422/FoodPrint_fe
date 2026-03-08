@@ -1,9 +1,12 @@
 import { StatusBar } from 'expo-status-bar'
-import { Alert, Button, StyleSheet, Text, View } from 'react-native'
+import { Alert, Button, Text, View } from 'react-native'
+
+import { useScreenStyles } from '../theme'
 
 export function HomeScreen() {
+    const styles = useScreenStyles()
     return (
-        <View style={styles.container}>
+        <View style={styles.screen}>
             <Text style={styles.title}>Home</Text>
             <Button
                 title="Click me"
@@ -13,17 +16,3 @@ export function HomeScreen() {
         </View>
     )
 }
-
-const styles = StyleSheet.create({
-    container: {
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        flex: 1,
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: '600',
-        marginBottom: 12,
-    },
-})
