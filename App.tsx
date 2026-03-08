@@ -1,21 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
-import { Alert, Button, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Provider as PaperProvider } from 'react-native-paper';
+
+import { AppNavigator } from './src/navigation/AppNavigator';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Button title="Click me" onPress={() => Alert.alert('Button pressed')} />
-      <Text>Open up App.tsx to start working on your app</Text>
+    <PaperProvider>
+      <AppNavigator />
       <StatusBar style="auto" />
-    </View>
+    </PaperProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    flex: 1,
-    justifyContent: 'center',
-  },
-});
