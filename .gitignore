@@ -1,6 +1,6 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies
 node_modules/
 
 # Expo
@@ -9,7 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native (generated, do not commit)
+/ios
+/android
 .kotlin/
 *.orig.*
 *.jks
@@ -21,21 +23,39 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
-# debug
+# Lock files（保留 pnpm-lock.yaml 提交，忽略其他包管理器的）
+package-lock.json
+yarn.lock
+bun.lock
+
+# 环境变量与密钥（勿提交）
+.env
+.env.*
+!.env.example
+
+# Debug / 日志
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
+logs/
 
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# 测试 / 覆盖率
+coverage/
+.nyc_output/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+*.pem
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 可选：Cursor 本地配置（若不想提交）
+# .cursor/
