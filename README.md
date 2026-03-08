@@ -70,6 +70,11 @@ FoodPrint/
 
 新增页面时，在 `src/screens` 下添加组件，并在 `src/navigation/AppNavigator.tsx` 中注册路由。
 
+## 文档
+
+- [Git 工作流与 Code Review](docs/GIT_WORKFLOW.md)：分支、提交、PR、Review 流程
+- [样式管理说明](docs/STYLE_GUIDE.md)：主题、设计令牌、页面样式与修改方式
+
 ## Git 与协作
 
 团队开发请遵循 [Git 工作流与 Code Review 说明](docs/GIT_WORKFLOW.md)，包括：新建分支、提交规范、发起 Pull Request、Code Review 及合并流程。
