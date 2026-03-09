@@ -41,6 +41,7 @@ function MainTabs() {
                 name="Home"
                 component={HomeScreen}
                 options={{
+                    headerShown: false,
                     tabBarLabel: 'Home',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
@@ -55,6 +56,7 @@ function MainTabs() {
                 name="Record"
                 component={RecordScreen}
                 options={{
+                    headerShown: false,
                     tabBarLabel: 'Record',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
