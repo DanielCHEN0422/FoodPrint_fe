@@ -1,15 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import React from 'react'
+import { useNavigation } from '@react-navigation/native'
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
+import React, { useState } from 'react'
 import {
+    Alert,
+    Modal,
     Pressable,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from 'react-native'
 import Svg, { Circle, Text as SvgText } from 'react-native-svg'
+
+import { FloatingChatButton } from '../components/common/FloatingChatButton'
 
 // ─── Colors ──────────────────────────────────────────────────
 const COLORS = {
@@ -25,6 +32,15 @@ const COLORS = {
 }
 
 // ─── Types ───────────────────────────────────────────────────
+type RootTabParamList = {
+    Home: undefined
+    Record: { initialMode?: 'text' } | undefined
+    Community: undefined
+    Profile: undefined
+}
+
+type HomeScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Home'>
+
 interface MealItem {
     id: string
     name: string
@@ -32,6 +48,20 @@ interface MealItem {
     time: string
     calories: number
     icon: keyof typeof MaterialCommunityIcons.glyphMap
+}
+
+interface ChatMessage {
+    id: string
+    text: string
+    sender: 'user' | 'assistant'
+    timestamp: Date
+}
+
+interface ChatMessage {
+    id: string
+    text: string
+    sender: 'user' | 'assistant'
+    timestamp: Date
 }
 
 // ─── Mock Data ───────────────────────────────────────────────
@@ -62,13 +92,34 @@ const MOCK_MEALS: MealItem[] = [
     },
 ]
 
-const CALORIE_CURRENT = 920
 const CALORIE_GOAL = 2000
-const CALORIE_REMAINING = CALORIE_GOAL - CALORIE_CURRENT
 const MACROS = [
     { label: 'Protein', value: '45g' },
     { label: 'Carbs', value: '120g' },
     { label: 'Fat', value: '28g' },
+]
+
+const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
+const MEAL_ICONS: { [key: string]: keyof typeof MaterialCommunityIcons.glyphMap } = {
+    'Breakfast': 'coffee',
+    'Lunch': 'silverware-fork-knife',
+    'Dinner': 'silverware-fork-knife',
+    'Snack': 'apple',
+}
+
+const MOCK_CHAT_MESSAGES: ChatMessage[] = [
+    {
+        id: '1',
+        text: "Hi! I'm your FoodPrint assistant. How can I help with your meals today?",
+        sender: 'assistant',
+        timestamp: new Date(),
+    },
+    {
+        id: '2', 
+        text: 'How many calories are in 150g of chicken breast?',
+        sender: 'user',
+        timestamp: new Date(),
+    },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -163,20 +214,206 @@ function MealItemCard({ meal }: { meal: MealItem }) {
     )
 }
 
-// ─── Handlers ────────────────────────────────────────────────
-// 👉 如果要跳转到 Record 页面，把下面这行改为：
-//    const handleAddMeal = () => navigation.navigate('Record')
-//    并在 HomeScreen 的参数中接收 navigation prop 或使用 useNavigation()
-const handleAddMeal = () => {
-    console.log('Add Meal')
+// ─── Chat Modal Component ──────────────────────────────────────────
+function ChatModal({
+    visible,
+    onClose,
+    messages,
+    inputText,
+    onInputChange,
+    onSendMessage,
+}: {
+    visible: boolean
+    onClose: () => void
+    messages: ChatMessage[]
+    inputText: string
+    onInputChange: (text: string) => void
+    onSendMessage: () => void
+}) {
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <View style={styles.chatOverlay}>
+                <View style={styles.chatContainer}>
+                    {/* Header */}
+                    <View style={styles.chatHeader}>
+                        <Text style={styles.chatTitle}>AI Chat</Text>
+                        <Pressable onPress={onClose}>
+                            <Ionicons name="close" size={24} color={COLORS.dark} />
+                        </Pressable>
+                    </View>
+
+                    {/* Messages */}
+                    <ScrollView style={styles.chatMessages} showsVerticalScrollIndicator={false}>
+                        {messages.map((message) => (
+                            <View
+                                key={message.id}
+                                style={[
+                                    styles.messageContainer,
+                                    message.sender === 'user' ? styles.userMessage : styles.assistantMessage,
+                                ]}
+                            >
+                                <View
+                                    style={[
+                                        styles.messageBubble,
+                                        message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.messageText,
+                                            message.sender === 'user' ? styles.userText : styles.assistantText,
+                                        ]}
+                                    >
+                                        {message.text}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+
+                    {/* Input Area */}
+                    <View style={styles.chatInputArea}>
+                        <TextInput
+                            style={styles.chatInput}
+                            value={inputText}
+                            onChangeText={onInputChange}
+                            placeholder="Ask about your meals..."
+                            placeholderTextColor={COLORS.sub}
+                            multiline
+                            maxLength={500}
+                        />
+                        <Pressable
+                            style={[
+                                styles.sendButton,
+                                !inputText.trim() && styles.sendButtonDisabled,
+                            ]}
+                            onPress={onSendMessage}
+                            disabled={!inputText.trim()}
+                        >
+                            <Ionicons
+                                name="send"
+                                size={18}
+                                color={inputText.trim() ? '#fff' : COLORS.sub}
+                            />
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    )
 }
 
-const handleChatPress = () => {
-    console.log('Chat pressed')
-}
+// ─── Handlers ────────────────────────────────────────────────
+// 在 HomeScreen 组件内部定义这些函数
 
 // ─── Main Component ──────────────────────────────────────────
 export function HomeScreen() {
+    const navigation = useNavigation<HomeScreenNavigationProp>()
+
+    // ─── State Management ─────────────────────────────────────
+    const [meals, setMeals] = useState<MealItem[]>(MOCK_MEALS)
+    const [viewAllVisible, setViewAllVisible] = useState(false)
+    const [addMealVisible, setAddMealVisible] = useState(false)
+    const [newMealName, setNewMealName] = useState('')
+    const [newMealType, setNewMealType] = useState('Breakfast')
+    const [newMealTime, setNewMealTime] = useState('')
+    const [newMealCalories, setNewMealCalories] = useState('')
+    
+    // Chat-related state
+    const [chatVisible, setChatVisible] = useState(false)
+    const [chatInput, setChatInput] = useState('')
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+
+    // ─── Computed Values ──────────────────────────────────────
+    const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0)
+    const remainingCalories = CALORIE_GOAL - totalCalories
+
+    // ─── Handlers ─────────────────────────────────────────────
+    const handleViewAll = () => {
+        setViewAllVisible(true)
+    }
+
+    const handleCloseViewAll = () => {
+        setViewAllVisible(false)
+    }
+
+    const handleAddMeal = () => {
+        setAddMealVisible(true)
+    }
+
+    const handleCloseAddMeal = () => {
+        setAddMealVisible(false)
+        // Reset form
+        setNewMealName('')
+        setNewMealType('Breakfast')
+        setNewMealTime('')
+        setNewMealCalories('')
+    }
+
+    const handleSaveMeal = () => {
+        // Validation
+        if (!newMealName.trim() || !newMealTime.trim() || !newMealCalories.trim()) {
+            Alert.alert('Error', 'Please fill all fields')
+            return
+        }
+
+        const calories = parseInt(newMealCalories, 10)
+        if (isNaN(calories) || calories <= 0) {
+            Alert.alert('Error', 'Please enter valid calories')
+            return
+        }
+
+        // Create new meal
+        const newMeal: MealItem = {
+            id: Date.now().toString(),
+            name: newMealName.trim(),
+            mealType: newMealType,
+            time: newMealTime.trim(),
+            calories,
+            icon: MEAL_ICONS[newMealType] || 'apple',
+        }
+
+        // Add to meals
+        setMeals(prev => [...prev, newMeal])
+        handleCloseAddMeal()
+    }
+
+    const handleChatPress = () => {
+        setChatVisible(true)
+    }
+
+    const handleCloseChat = () => {
+        setChatVisible(false)
+    }
+
+    const handleSendMessage = () => {
+        const messageText = chatInput.trim()
+        if (!messageText) return
+
+        // Add user message
+        const userMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: messageText,
+            sender: 'user',
+            timestamp: new Date(),
+        }
+
+        // Add mock assistant response
+        const assistantMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            text: 'Thanks! AI response will be connected later.',
+            sender: 'assistant', 
+            timestamp: new Date(),
+        }
+
+        setChatMessages(prev => [...prev, userMessage, assistantMessage])
+        setChatInput('')
+    }
     return (
         <SafeAreaView style={styles.safe}>
             <ScrollView
@@ -199,7 +436,7 @@ export function HomeScreen() {
                             </Text>
                             <View style={styles.calorieRow}>
                                 <Text style={styles.calorieCurrent}>
-                                    {CALORIE_CURRENT}
+                                    {totalCalories}
                                 </Text>
                                 <Text style={styles.calorieGoal}>
                                     {' '}
@@ -207,7 +444,7 @@ export function HomeScreen() {
                                 </Text>
                             </View>
                             <Text style={styles.calorieRemaining}>
-                                {CALORIE_REMAINING} cal remaining
+                                {remainingCalories} cal remaining
                             </Text>
                         </View>
                     </View>
@@ -215,7 +452,7 @@ export function HomeScreen() {
                     {/* Ring - positioned absolutely */}
                     <View style={styles.ringContainer}>
                         <CalorieRing
-                            progress={CALORIE_CURRENT / CALORIE_GOAL}
+                            progress={totalCalories / CALORIE_GOAL}
                         />
                     </View>
 
@@ -237,14 +474,14 @@ export function HomeScreen() {
                 {/* ── Section Header ── */}
                 <View style={[styles.sectionHeader, { marginHorizontal: 16 }]}>
                     <Text style={styles.sectionTitle}>Today's Meals</Text>
-                    <Pressable>
+                    <Pressable onPress={handleViewAll}>
                         <Text style={styles.viewAll}>View All</Text>
                     </Pressable>
                 </View>
 
                 {/* ── Meal List ── */}
                 <View style={{ paddingHorizontal: 16 }}>
-                    {MOCK_MEALS.map((meal) => (
+                    {meals.map((meal) => (
                         <MealItemCard key={meal.id} meal={meal} />
                     ))}
                 </View>
@@ -267,19 +504,137 @@ export function HomeScreen() {
             </ScrollView>
 
             {/* ── Floating Chat Button ── */}
-            <Pressable
-                style={({ pressed }) => [
-                    styles.fab,
-                    pressed && styles.fabPressed,
-                ]}
-                onPress={handleChatPress}
+            <FloatingChatButton onPress={handleChatPress} />
+
+            {/* ── Chat Modal ── */}
+            <ChatModal
+                visible={chatVisible}
+                onClose={handleCloseChat}
+                messages={chatMessages}
+                inputText={chatInput}
+                onInputChange={setChatInput}
+                onSendMessage={handleSendMessage}
+            />
+
+            {/* ── View All Modal ── */}
+            <Modal
+                visible={viewAllVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={handleCloseViewAll}
             >
-                <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={22}
-                    color="#fff"
-                />
-            </Pressable>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>All Meals</Text>
+                            <Pressable onPress={handleCloseViewAll}>
+                                <Ionicons name="close" size={24} color={COLORS.dark} />
+                            </Pressable>
+                        </View>
+                        
+                        <ScrollView style={styles.modalContent}>
+                            {meals.map((meal) => (
+                                <MealItemCard key={meal.id} meal={meal} />
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ── Add Meal Modal ── */}
+            <Modal
+                visible={addMealVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={handleCloseAddMeal}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Add New Meal</Text>
+                            <Pressable onPress={handleCloseAddMeal}>
+                                <Ionicons name="close" size={24} color={COLORS.dark} />
+                            </Pressable>
+                        </View>
+                        
+                        <ScrollView style={styles.modalContent}>
+                            <View style={styles.formGroup}>
+                                <Text style={styles.formLabel}>Meal Name</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={newMealName}
+                                    onChangeText={setNewMealName}
+                                    placeholder="Enter meal name"
+                                    placeholderTextColor={COLORS.sub}
+                                />
+                            </View>
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.formLabel}>Meal Type</Text>
+                                <View style={styles.mealTypeRow}>
+                                    {MEAL_TYPES.map((type) => (
+                                        <Pressable
+                                            key={type}
+                                            style={[
+                                                styles.mealTypeBtn,
+                                                newMealType === type && styles.mealTypeBtnActive,
+                                            ]}
+                                            onPress={() => setNewMealType(type)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.mealTypeBtnText,
+                                                    newMealType === type && styles.mealTypeBtnTextActive,
+                                                ]}
+                                            >
+                                                {type}
+                                            </Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </View>
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.formLabel}>Time</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={newMealTime}
+                                    onChangeText={setNewMealTime}
+                                    placeholder="e.g. 12:30 PM"
+                                    placeholderTextColor={COLORS.sub}
+                                />
+                            </View>
+
+                            <View style={styles.formGroup}>
+                                <Text style={styles.formLabel}>Calories</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={newMealCalories}
+                                    onChangeText={setNewMealCalories}
+                                    placeholder="Enter calories"
+                                    placeholderTextColor={COLORS.sub}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+
+                            <View style={styles.modalActions}>
+                                <Pressable
+                                    style={[styles.modalBtn, styles.modalBtnCancel]}
+                                    onPress={handleCloseAddMeal}
+                                >
+                                    <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.modalBtn, styles.modalBtnSave]}
+                                    onPress={handleSaveMeal}
+                                >
+                                    <Text style={styles.modalBtnSaveText}>Save Meal</Text>
+                                </Pressable>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     )
 }
@@ -473,24 +828,208 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // ── FAB (Chat) ──
-    fab: {
-        alignItems: 'center',
-        backgroundColor: COLORS.primary,
-        borderRadius: 26,
-        bottom: 32,
-        elevation: 4,
-        height: 52,
-        justifyContent: 'center',
-        position: 'absolute',
-        right: 20,
-        shadowColor: COLORS.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 5,
-        width: 52,
+    // ── FAB (Chat) ── (现在由 FloatingChatButton 组件处理)
+    // fab styles 已移至 FloatingChatButton 组件
+
+    // ── Modal Styles ──
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
     },
-    fabPressed: {
-        backgroundColor: COLORS.primaryDark,
+    modalContainer: {
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '80%',
+        minHeight: '50%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    modalTitle: {
+        color: COLORS.dark,
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    modalContent: {
+        flex: 1,
+        padding: 20,
+    },
+    
+    // ── Form Styles ──
+    formGroup: {
+        marginBottom: 20,
+    },
+    formLabel: {
+        color: COLORS.dark,
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    textInput: {
+        backgroundColor: COLORS.bg,
+        borderRadius: 12,
+        padding: 12,
+        fontSize: 16,
+        color: COLORS.dark,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    mealTypeRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    mealTypeBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: COLORS.bg,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    mealTypeBtnActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    mealTypeBtnText: {
+        color: COLORS.sub,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    mealTypeBtnTextActive: {
+        color: '#fff',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 20,
+    },
+    modalBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    modalBtnCancel: {
+        backgroundColor: COLORS.bg,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    modalBtnSave: {
+        backgroundColor: COLORS.primary,
+    },
+    modalBtnCancelText: {
+        color: COLORS.sub,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalBtnSaveText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    // ── Chat Styles ──
+    chatOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    chatContainer: {
+        backgroundColor: COLORS.card,
+        borderRadius: 20,
+        maxHeight: '80%',
+        minHeight: '60%',
+        overflow: 'hidden',
+    },
+    chatHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+        backgroundColor: COLORS.card,
+    },
+    chatTitle: {
+        color: COLORS.dark,
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    chatMessages: {
+        flex: 1,
+        padding: 16,
+    },
+    messageContainer: {
+        marginBottom: 12,
+    },
+    userMessage: {
+        alignItems: 'flex-end',
+    },
+    assistantMessage: {
+        alignItems: 'flex-start',
+    },
+    messageBubble: {
+        maxWidth: '80%',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 18,
+    },
+    userBubble: {
+        backgroundColor: COLORS.primary,
+        borderBottomRightRadius: 4,
+    },
+    assistantBubble: {
+        backgroundColor: COLORS.iconBg,
+        borderBottomLeftRadius: 4,
+    },
+    messageText: {
+        fontSize: 15,
+        lineHeight: 20,
+    },
+    userText: {
+        color: '#fff',
+    },
+    assistantText: {
+        color: COLORS.dark,
+    },
+    chatInputArea: {
+        flexDirection: 'row',
+        padding: 16,
+        paddingTop: 12,
+        backgroundColor: COLORS.card,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+        alignItems: 'flex-end',
+    },
+    chatInput: {
+        flex: 1,
+        backgroundColor: COLORS.bg,
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        fontSize: 15,
+        color: COLORS.dark,
+        maxHeight: 80,
+        marginRight: 8,
+    },
+    sendButton: {
+        backgroundColor: COLORS.primary,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sendButtonDisabled: {
+        backgroundColor: COLORS.iconBg,
     },
 })
