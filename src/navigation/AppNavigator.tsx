@@ -1,22 +1,23 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { useTheme } from 'react-native-paper'
 
+import { useAuth } from '../context/AuthContext'
 import { CommunityScreen } from '../screens/CommunityScreen'
 import { HomeScreen } from '../screens/HomeScreen'
+import { LoginScreen } from '../screens/LoginScreen'
+import { OnboardingScreen } from '../screens/OnboardingScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { RecordScreen } from '../screens/RecordScreen'
-
-export type RootTabParamList = {
-    Home: undefined
-    Record: undefined
-    Community: undefined
-    Profile: undefined
-}
+import { RegisterScreen } from '../screens/RegisterScreen'
+import type { AuthStackParamList, RootTabParamList } from './types'
 
 const Tab = createBottomTabNavigator<RootTabParamList>()
+const AuthStack = createNativeStackNavigator<AuthStackParamList>()
 
-export function AppNavigator() {
+function MainTabs() {
     const theme = useTheme()
     const { colors } = theme
 
@@ -95,3 +96,56 @@ export function AppNavigator() {
         </Tab.Navigator>
     )
 }
+
+function AuthNavigator() {
+    const theme = useTheme()
+    const { colors } = theme
+
+    return (
+        <AuthStack.Navigator
+            screenOptions={{
+                contentStyle: { backgroundColor: colors.background },
+                headerShown: false,
+            }}
+        >
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} />
+        </AuthStack.Navigator>
+    )
+}
+
+export function AppNavigator() {
+    const theme = useTheme()
+    const { hasCompletedOnboarding, isAuthenticated, isLoading } = useAuth()
+
+    if (isLoading) {
+        return (
+            <View
+                style={[
+                    styles.loadingContainer,
+                    { backgroundColor: theme.colors.background },
+                ]}
+            >
+                <ActivityIndicator color={theme.colors.primary} size="large" />
+            </View>
+        )
+    }
+
+    if (!isAuthenticated) {
+        return <AuthNavigator />
+    }
+
+    if (!hasCompletedOnboarding) {
+        return <OnboardingScreen />
+    }
+
+    return <MainTabs />
+}
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
+    },
+})
