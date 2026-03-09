@@ -12,8 +12,8 @@ export function ProfileScreen() {
     return (
         <View style={styles.screen}>
             <Text style={styles.title}>Profile</Text>
-            <Text>{userEmail ? `当前账号：${userEmail}` : '未登录'}</Text>
-            <Button title="退出登录" onPress={() => void logout()} />
+            <Text>{userEmail ? `Account: ${userEmail}` : 'Not signed in'}</Text>
+            <Button title="Sign Out" onPress={() => void logout()} />
             <StatusBar style="auto" />
         </View>
     )

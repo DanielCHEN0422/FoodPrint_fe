@@ -16,11 +16,15 @@ type AuthActionResult = {
 
 type AuthContextValue = {
     isAuthenticated: boolean
+    hasCompletedOnboarding: boolean
     isLoading: boolean
+    userProfile: UserProfile | null
     userEmail: string | null
+    completeOnboarding: () => Promise<void>
     login: (email: string, password: string) => Promise<AuthActionResult>
     register: (email: string, password: string) => Promise<AuthActionResult>
     logout: () => Promise<void>
+    updateProfile: (profile: UserProfile) => Promise<void>
 }
 
 type StoredUser = {
@@ -32,19 +36,78 @@ type StoredSession = {
     email: string
 }
 
+export type UserProfile = {
+    email: string
+    goal: 'lose' | 'maintain' | 'gain'
+    gender: 'male' | 'female' | 'other'
+    height: number
+    weight: number
+    age: number
+    activityLevel: 'low' | 'medium' | 'high'
+    dietPreference: string
+    dailyCalories: number
+}
+
 const AUTH_USER_KEY = '@foodprint/auth_user'
 const AUTH_SESSION_KEY = '@foodprint/auth_session'
+const AUTH_PROFILE_KEY = '@foodprint/auth_profile'
+const AUTH_ONBOARDING_KEY = '@foodprint/auth_onboarding_completed'
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+type PasswordStrength = {
+    minLength: boolean
+    hasUppercase: boolean
+    hasLowercase: boolean
+    hasNumber: boolean
+    hasSpecial: boolean
+    score: number
+    isStrong: boolean
+}
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+export function isValidEmail(email: string) {
+    return EMAIL_REGEX.test(email.trim().toLowerCase())
+}
+
+export function evaluatePasswordStrength(password: string): PasswordStrength {
+    const result: PasswordStrength = {
+        minLength: password.length >= 8,
+        hasUppercase: /[A-Z]/.test(password),
+        hasLowercase: /[a-z]/.test(password),
+        hasNumber: /\d/.test(password),
+        hasSpecial: /[^A-Za-z0-9]/.test(password),
+        score: 0,
+        isStrong: false,
+    }
+
+    result.score = [
+        result.minLength,
+        result.hasUppercase,
+        result.hasLowercase,
+        result.hasNumber,
+        result.hasSpecial,
+    ].filter(Boolean).length
+    result.isStrong = result.score === 5
+
+    return result
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
+    const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true)
     const [isLoading, setIsLoading] = useState(true)
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
     const [userEmail, setUserEmail] = useState<string | null>(null)
 
     useEffect(() => {
         async function restoreSession() {
             try {
-                const sessionRaw = await AsyncStorage.getItem(AUTH_SESSION_KEY)
+                const [sessionRaw, onboardingRaw, profileRaw] =
+                    await Promise.all([
+                        AsyncStorage.getItem(AUTH_SESSION_KEY),
+                        AsyncStorage.getItem(AUTH_ONBOARDING_KEY),
+                        AsyncStorage.getItem(AUTH_PROFILE_KEY),
+                    ])
                 if (!sessionRaw) {
                     return
                 }
@@ -53,9 +116,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 if (session.email) {
                     setUserEmail(session.email)
                 }
+
+                if (profileRaw) {
+                    const profile = JSON.parse(profileRaw) as UserProfile
+                    setUserProfile(profile)
+                }
+
+                if (onboardingRaw === 'false') {
+                    setHasCompletedOnboarding(false)
+                } else {
+                    setHasCompletedOnboarding(true)
+                }
             } catch {
                 await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+                await AsyncStorage.removeItem(AUTH_ONBOARDING_KEY)
                 setUserEmail(null)
+                setHasCompletedOnboarding(true)
             } finally {
                 setIsLoading(false)
             }
@@ -66,47 +142,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const login = useCallback(
         async (email: string, password: string): Promise<AuthActionResult> => {
+            void password
             const normalizedEmail = email.trim().toLowerCase()
-            if (!normalizedEmail || !password) {
-                return {
-                    success: false,
-                    message: '请输入邮箱和密码',
-                }
-            }
-
             try {
-                const userRaw = await AsyncStorage.getItem(AUTH_USER_KEY)
-                if (!userRaw) {
-                    return {
-                        success: false,
-                        message: '用户不存在，请先注册',
-                    }
-                }
-
-                const user = JSON.parse(userRaw) as StoredUser
-                if (
-                    user.email !== normalizedEmail ||
-                    user.password !== password
-                ) {
-                    return {
-                        success: false,
-                        message: '邮箱或密码错误',
-                    }
-                }
-
-                const session: StoredSession = { email: user.email }
+                const sessionEmail =
+                    normalizedEmail || `mock-user-${Date.now()}@foodprint.local`
+                const session: StoredSession = { email: sessionEmail }
                 await AsyncStorage.setItem(
                     AUTH_SESSION_KEY,
                     JSON.stringify(session)
                 )
-                setUserEmail(user.email)
+                setUserEmail(sessionEmail)
+                setHasCompletedOnboarding(true)
+                await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
 
                 return { success: true }
             } catch {
-                return {
-                    success: false,
-                    message: '登录失败，请稍后重试',
-                }
+                const fallbackEmail =
+                    normalizedEmail || `mock-user-${Date.now()}@foodprint.local`
+                setUserEmail(fallbackEmail)
+                setHasCompletedOnboarding(true)
+                return { success: true }
             }
         },
         []
@@ -114,25 +170,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const register = useCallback(
         async (email: string, password: string): Promise<AuthActionResult> => {
-            const normalizedEmail = email.trim().toLowerCase()
-            if (!normalizedEmail || !password) {
-                return {
-                    success: false,
-                    message: '请输入邮箱和密码',
-                }
-            }
-
-            if (password.length < 6) {
-                return {
-                    success: false,
-                    message: '密码至少 6 位',
-                }
-            }
+            const normalizedEmail =
+                email.trim().toLowerCase() || `mock-user-${Date.now()}@foodprint.local`
+            const normalizedPassword = password || 'mock-password'
 
             try {
                 const user: StoredUser = {
                     email: normalizedEmail,
-                    password,
+                    password: normalizedPassword,
                 }
                 const session: StoredSession = {
                     email: normalizedEmail,
@@ -144,35 +189,76 @@ export function AuthProvider({ children }: PropsWithChildren) {
                         AUTH_SESSION_KEY,
                         JSON.stringify(session)
                     ),
+                    AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'false'),
                 ])
                 setUserEmail(normalizedEmail)
+                setHasCompletedOnboarding(false)
+                setUserProfile(null)
 
                 return { success: true }
             } catch {
-                return {
-                    success: false,
-                    message: '注册失败，请稍后重试',
-                }
+                setUserEmail(normalizedEmail)
+                setHasCompletedOnboarding(false)
+                setUserProfile(null)
+                return { success: true }
             }
         },
         []
     )
 
     const logout = useCallback(async () => {
-        await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+        // 先更新内存态，确保 UI 立即回到未登录导航
+        setHasCompletedOnboarding(true)
         setUserEmail(null)
+        try {
+            await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+        } catch {
+            // mock 场景下不阻塞退出流程
+        }
+    }, [])
+
+    const updateProfile = useCallback(async (profile: UserProfile) => {
+        setUserProfile(profile)
+        try {
+            await AsyncStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(profile))
+        } catch {
+            // profile 持久化失败不阻断 onboarding 流程
+        }
+    }, [])
+
+    const completeOnboarding = useCallback(async () => {
+        setHasCompletedOnboarding(true)
+        try {
+            await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
+        } catch {
+            // 持久化失败不阻断页面流转
+        }
     }, [])
 
     const value = useMemo<AuthContextValue>(
         () => ({
             isAuthenticated: !!userEmail,
+            hasCompletedOnboarding,
             isLoading,
+            userProfile,
             userEmail,
+            completeOnboarding,
             login,
             register,
             logout,
+            updateProfile,
         }),
-        [isLoading, login, logout, register, userEmail]
+        [
+            completeOnboarding,
+            hasCompletedOnboarding,
+            isLoading,
+            login,
+            logout,
+            register,
+            updateProfile,
+            userEmail,
+            userProfile,
+        ]
     )
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

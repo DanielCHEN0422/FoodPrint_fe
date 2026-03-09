@@ -5,12 +5,13 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { useTheme } from 'react-native-paper'
 
 import { useAuth } from '../context/AuthContext'
-import { LoginScreen } from '../screens/LoginScreen'
-import { RegisterScreen } from '../screens/RegisterScreen'
 import { CommunityScreen } from '../screens/CommunityScreen'
 import { HomeScreen } from '../screens/HomeScreen'
+import { LoginScreen } from '../screens/LoginScreen'
+import { OnboardingScreen } from '../screens/OnboardingScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { RecordScreen } from '../screens/RecordScreen'
+import { RegisterScreen } from '../screens/RegisterScreen'
 import type { AuthStackParamList, RootTabParamList } from './types'
 
 const Tab = createBottomTabNavigator<RootTabParamList>()
@@ -103,29 +104,19 @@ function AuthNavigator() {
     return (
         <AuthStack.Navigator
             screenOptions={{
-                headerTitleAlign: 'center',
-                headerStyle: { backgroundColor: colors.background },
-                headerTintColor: colors.onSurface,
                 contentStyle: { backgroundColor: colors.background },
+                headerShown: false,
             }}
         >
-            <AuthStack.Screen
-                name="Login"
-                component={LoginScreen}
-                options={{ title: '登录' }}
-            />
-            <AuthStack.Screen
-                name="Register"
-                component={RegisterScreen}
-                options={{ title: '注册' }}
-            />
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} />
         </AuthStack.Navigator>
     )
 }
 
 export function AppNavigator() {
     const theme = useTheme()
-    const { isAuthenticated, isLoading } = useAuth()
+    const { hasCompletedOnboarding, isAuthenticated, isLoading } = useAuth()
 
     if (isLoading) {
         return (
@@ -140,7 +131,15 @@ export function AppNavigator() {
         )
     }
 
-    return isAuthenticated ? <MainTabs /> : <AuthNavigator />
+    if (!isAuthenticated) {
+        return <AuthNavigator />
+    }
+
+    if (!hasCompletedOnboarding) {
+        return <OnboardingScreen />
+    }
+
+    return <MainTabs />
 }
 
 const styles = StyleSheet.create({
