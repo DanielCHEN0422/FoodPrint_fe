@@ -1,7 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
+import * as ImagePicker from 'expo-image-picker'
 import React, { useState } from 'react'
 import {
+    Alert,
+    Modal,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -10,6 +13,8 @@ import {
     TextInput,
     View,
 } from 'react-native'
+
+import { FloatingChatButton } from '../components/common/FloatingChatButton'
 
 // ─── Colors (consistent with HomeScreen) ────────────────────
 const COLORS = {
@@ -28,33 +33,224 @@ const COLORS = {
 // ─── Types ───────────────────────────────────────────────────
 type RecordMode = 'text' | 'photo'
 
+interface ChatMessage {
+    id: string
+    text: string
+    sender: 'user' | 'assistant'
+    timestamp: Date
+}
+
 // ─── Mock Data ───────────────────────────────────────────────
 const EXAMPLE_DESCRIPTIONS = [
     'Lunch: Caesar salad with grilled chicken breast, olive oil dressing',
     'Dinner: One bowl of brown rice, steamed fish, stir-fried vegetables',
 ]
 
+const MOCK_CHAT_MESSAGES: ChatMessage[] = [
+    {
+        id: '1',
+        text: "Hi! I'm your FoodPrint assistant. How can I help with your meals today?",
+        sender: 'assistant',
+        timestamp: new Date(),
+    },
+]
+
 // ─── Handlers ────────────────────────────────────────────────
-const handleTakePhoto = () => {
-    console.log('Take Photo')
-}
-
-const handleUploadFromGallery = () => {
-    console.log('Upload from Gallery')
-}
-
 const handleAnalyzeText = () => {
     console.log('Analyze Text')
 }
 
-const handleChatPress = () => {
-    console.log('Chat pressed')
+// ─── Chat Modal Component ──────────────────────────────────────────
+function ChatModal({
+    visible,
+    onClose,
+    messages,
+    inputText,
+    onInputChange,
+    onSendMessage,
+}: {
+    visible: boolean
+    onClose: () => void
+    messages: ChatMessage[]
+    inputText: string
+    onInputChange: (text: string) => void
+    onSendMessage: () => void
+}) {
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <View style={styles.chatOverlay}>
+                <View style={styles.chatContainer}>
+                    {/* Header */}
+                    <View style={styles.chatHeader}>
+                        <Text style={styles.chatTitle}>AI Chat</Text>
+                        <Pressable onPress={onClose}>
+                            <Ionicons name="close" size={24} color={COLORS.dark} />
+                        </Pressable>
+                    </View>
+
+                    {/* Messages */}
+                    <ScrollView style={styles.chatMessages} showsVerticalScrollIndicator={false}>
+                        {messages.map((message) => (
+                            <View
+                                key={message.id}
+                                style={[
+                                    styles.messageContainer,
+                                    message.sender === 'user' ? styles.userMessage : styles.assistantMessage,
+                                ]}
+                            >
+                                <View
+                                    style={[
+                                        styles.messageBubble,
+                                        message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.messageText,
+                                            message.sender === 'user' ? styles.userText : styles.assistantText,
+                                        ]}
+                                    >
+                                        {message.text}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+
+                    {/* Input Area */}
+                    <View style={styles.chatInputArea}>
+                        <TextInput
+                            style={styles.chatInput}
+                            value={inputText}
+                            onChangeText={onInputChange}
+                            placeholder="Ask about your meals..."
+                            placeholderTextColor={COLORS.sub}
+                            multiline
+                            maxLength={500}
+                        />
+                        <Pressable
+                            style={[
+                                styles.sendButton,
+                                !inputText.trim() && styles.sendButtonDisabled,
+                            ]}
+                            onPress={onSendMessage}
+                            disabled={!inputText.trim()}
+                        >
+                            <Ionicons
+                                name="send"
+                                size={18}
+                                color={inputText.trim() ? '#fff' : COLORS.sub}
+                            />
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    )
 }
 
 // ─── Main Component ──────────────────────────────────────────
 export function RecordScreen() {
     const [activeMode, setActiveMode] = useState<RecordMode>('text')
     const [textInput, setTextInput] = useState('')
+    
+    // Chat-related state - FloatingChatButton 同步接入
+    const [chatVisible, setChatVisible] = useState(false)
+    const [chatInput, setChatInput] = useState('')
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+    
+    // ─── Photo/Gallery Handlers - 接入手机能力 ─────────────────────
+    const handleTakePhoto = async () => {
+        try {
+            // 请求相机权限
+            const { status } = await ImagePicker.requestCameraPermissionsAsync()
+            if (status !== 'granted') {
+                Alert.alert('Permission denied', 'Camera permission is required to take photos')
+                return
+            }
+            
+            // 打开相机
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+            })
+            
+            if (!result.canceled && result.assets?.[0]?.uri) {
+                console.log('Photo taken:', result.assets[0].uri)
+                Alert.alert('Photo taken', `Image URI: ${result.assets[0].uri}`)
+            }
+        } catch (error) {
+            console.log('Take photo error:', error)
+            Alert.alert('Error', 'Failed to take photo')
+        }
+    }
+    
+    const handleUploadFromGallery = async () => {
+        try {
+            // 请求媒体库权限
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+            if (status !== 'granted') {
+                Alert.alert('Permission denied', 'Media library permission is required to access photos')
+                return
+            }
+            
+            // 打开相册
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+            })
+            
+            if (!result.canceled && result.assets?.[0]?.uri) {
+                console.log('Image selected:', result.assets[0].uri)
+                Alert.alert('Image selected', `Image URI: ${result.assets[0].uri}`)
+            }
+        } catch (error) {
+            console.log('Upload from gallery error:', error)
+            Alert.alert('Error', 'Failed to select image from gallery')
+        }
+    }
+    
+    // ─── Chat Handlers - 复用HomeScreen聊天逻辑 ─────────────────────
+    const handleChatPress = () => {
+        setChatVisible(true)
+    }
+    
+    const handleCloseChat = () => {
+        setChatVisible(false)
+    }
+    
+    const handleSendMessage = () => {
+        const messageText = chatInput.trim()
+        if (!messageText) return
+        
+        // Add user message
+        const userMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: messageText,
+            sender: 'user',
+            timestamp: new Date(),
+        }
+        
+        // Add mock assistant response
+        const assistantMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            text: 'Thanks! AI response will be connected later.',
+            sender: 'assistant',
+            timestamp: new Date(),
+        }
+        
+        setChatMessages(prev => [...prev, userMessage, assistantMessage])
+        setChatInput('')
+    }
 
     // ─── Segmented Control Renderer ─────────────────────────
     const renderSegmentedControl = () => (
@@ -252,7 +448,7 @@ export function RecordScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header with white background */}
+                {/* Header with white background - 修复安卓模拟器遮挡问题 */}
                 <View style={styles.headerContainer}>
                     <Text style={styles.header}>FoodPrint</Text>
                 </View>
@@ -271,20 +467,18 @@ export function RecordScreen() {
                 <View style={{ height: 80 }} />
             </ScrollView>
 
-            {/* Floating Chat Button */}
-            <Pressable
-                style={({ pressed }) => [
-                    styles.fab,
-                    pressed && styles.fabPressed,
-                ]}
-                onPress={handleChatPress}
-            >
-                <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={22}
-                    color="#fff"
-                />
-            </Pressable>
+            {/* FloatingChatButton 同步接入 - 与HomeScreen保持统一 */}
+            <FloatingChatButton onPress={handleChatPress} />
+            
+            {/* Chat Modal - 复用HomeScreen的聊天弹窗逻辑 */}
+            <ChatModal
+                visible={chatVisible}
+                onClose={handleCloseChat}
+                messages={chatMessages}
+                inputText={chatInput}
+                onInputChange={setChatInput}
+                onSendMessage={handleSendMessage}
+            />
         </SafeAreaView>
     )
 }
@@ -295,6 +489,7 @@ const styles = StyleSheet.create({
     safe: {
         backgroundColor: COLORS.bg,
         flex: 1,
+        paddingTop: 0, // SafeAreaView 会自动处理状态栏
     },
     scroll: {
         flex: 1,
@@ -304,11 +499,11 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
 
-    // ── Header ──
+    // ── Header - 添加适当的padding避免遮挡 ──
     headerContainer: {
         backgroundColor: COLORS.card,
         paddingHorizontal: 16,
-        paddingTop: 4,
+        paddingTop: 8, // 增加顶部padding避免被状态栏遮挡
         paddingBottom: 16,
         marginBottom: 20,
     },
@@ -499,24 +694,98 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 
-    // ── FAB ──
-    fab: {
+    // ── Chat Modal Styles ──
+    chatOverlay: {
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        flex: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+    },
+    chatContainer: {
+        backgroundColor: COLORS.card,
+        borderRadius: 20,
+        maxHeight: '80%',
+        width: '100%',
+    },
+    chatHeader: {
+        alignItems: 'center',
+        borderBottomColor: '#F0F0F0',
+        borderBottomWidth: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    chatTitle: {
+        color: COLORS.dark,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    chatMessages: {
+        flexGrow: 1,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    messageContainer: {
+        marginBottom: 12,
+    },
+    userMessage: {
+        alignItems: 'flex-end',
+    },
+    assistantMessage: {
+        alignItems: 'flex-start',
+    },
+    messageBubble: {
+        borderRadius: 16,
+        maxWidth: '80%',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    userBubble: {
+        backgroundColor: COLORS.primary,
+    },
+    assistantBubble: {
+        backgroundColor: '#F5F5F5',
+    },
+    messageText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    userText: {
+        color: '#fff',
+    },
+    assistantText: {
+        color: COLORS.dark,
+    },
+    chatInputArea: {
+        alignItems: 'flex-end',
+        borderTopColor: '#F0F0F0',
+        borderTopWidth: 1,
+        flexDirection: 'row',
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    chatInput: {
+        backgroundColor: '#F8F9FA',
+        borderRadius: 12,
+        color: COLORS.dark,
+        flex: 1,
+        fontSize: 14,
+        maxHeight: 100,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    sendButton: {
         alignItems: 'center',
         backgroundColor: COLORS.primary,
-        borderRadius: 26,
-        bottom: 28,
-        elevation: 4,
-        height: 52,
+        borderRadius: 12,
+        height: 36,
         justifyContent: 'center',
-        position: 'absolute',
-        right: 20,
-        shadowColor: COLORS.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 5,
-        width: 52,
+        width: 36,
     },
-    fabPressed: {
-        backgroundColor: COLORS.primaryDark,
+    sendButtonDisabled: {
+        backgroundColor: '#E0E0E0',
     },
 })

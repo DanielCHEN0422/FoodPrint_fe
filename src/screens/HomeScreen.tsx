@@ -14,7 +14,7 @@ import {
     TextInput,
     View,
 } from 'react-native'
-import Svg, { Circle, Text as SvgText } from 'react-native-svg'
+import Svg, { Circle } from 'react-native-svg'
 
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
 
@@ -159,20 +159,14 @@ function CalorieRing({ progress }: { progress: number }) {
                     strokeLinecap="round"
                     transform={`rotate(-90 ${size / 2} ${size / 2})`}
                 />
-                
-                {/* Percentage text */}
-                <SvgText
-                    x={size / 2}
-                    y={size / 2}
-                    textAnchor="middle"
-                    dy="0.3em"
-                    fontSize="14"
-                    fontWeight="600"
-                    fill={COLORS.dark}
-                >
-                    {Math.round(pct * 100)}%
-                </SvgText>
             </Svg>
+            
+            {/* 修复46%文本真正居中 - 使用绝对定位容器覆盖SVG */}
+            <View style={ringStyles.textContainer}>
+                <Text style={ringStyles.percentageText}>
+                    {Math.round(pct * 100)}%
+                </Text>
+            </View>
         </View>
     )
 }
@@ -181,6 +175,25 @@ const ringStyles = StyleSheet.create({
     container: {
         alignItems: 'center',
         justifyContent: 'center',
+        width: 80,      // 明确外层容器尺寸
+        height: 80,
+        position: 'relative',
+    },
+    // 修复46%文本真正居中 - 绝对定位文本容器
+    textContainer: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        top: 0,
+        left: 0,
+    },
+    percentageText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.dark,
+        textAlign: 'center',
     },
 })
 
@@ -421,7 +434,7 @@ export function HomeScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header with white background */}
+                {/* Header with white background - 修复安卓模拟器遮挡问题 */}
                 <View style={styles.headerContainer}>
                     <Text style={styles.header}>FoodPrint</Text>
                 </View>
@@ -645,6 +658,7 @@ const styles = StyleSheet.create({
     safe: {
         backgroundColor: COLORS.bg,
         flex: 1,
+        paddingTop: 0, // SafeAreaView 会自动处理状态栏
     },
     scroll: {
         flex: 1,
@@ -654,11 +668,11 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
 
-    // ── Header ──
+    // ── Header - 添加适当的padding避免遮挡 ──
     headerContainer: {
         backgroundColor: COLORS.card,
         paddingHorizontal: 16,
-        paddingTop: 4,
+        paddingTop: 8, // 增加顶部padding避免被状态栏遮挡
         paddingBottom: 16,
         marginBottom: 16,
     },
