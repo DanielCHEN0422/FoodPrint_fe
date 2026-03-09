@@ -9,6 +9,10 @@ import {
     useState,
 } from 'react'
 
+import type { UserProfileDto } from '../api/types'
+import { getMe } from '../api/user'
+import { supabase } from '../lib/supabase'
+
 type AuthActionResult = {
     success: boolean
     message?: string
@@ -27,15 +31,6 @@ type AuthContextValue = {
     updateProfile: (profile: UserProfile) => Promise<void>
 }
 
-type StoredUser = {
-    email: string
-    password: string
-}
-
-type StoredSession = {
-    email: string
-}
-
 export type UserProfile = {
     email: string
     goal: 'lose' | 'maintain' | 'gain'
@@ -48,7 +43,6 @@ export type UserProfile = {
     dailyCalories: number
 }
 
-const AUTH_USER_KEY = '@foodprint/auth_user'
 const AUTH_SESSION_KEY = '@foodprint/auth_session'
 const AUTH_PROFILE_KEY = '@foodprint/auth_profile'
 const AUTH_ONBOARDING_KEY = '@foodprint/auth_onboarding_completed'
@@ -102,24 +96,48 @@ export function AuthProvider({ children }: PropsWithChildren) {
     useEffect(() => {
         async function restoreSession() {
             try {
-                const [sessionRaw, onboardingRaw, profileRaw] =
-                    await Promise.all([
-                        AsyncStorage.getItem(AUTH_SESSION_KEY),
-                        AsyncStorage.getItem(AUTH_ONBOARDING_KEY),
-                        AsyncStorage.getItem(AUTH_PROFILE_KEY),
-                    ])
-                if (!sessionRaw) {
-                    return
+                await supabase.auth.refreshSession()
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession()
+                if (session?.user?.email) {
+                    setUserEmail(session.user.email)
                 }
 
-                const session = JSON.parse(sessionRaw) as StoredSession
-                if (session.email) {
-                    setUserEmail(session.email)
-                }
+                const [onboardingRaw, profileRaw] = await Promise.all([
+                    AsyncStorage.getItem(AUTH_ONBOARDING_KEY),
+                    AsyncStorage.getItem(AUTH_PROFILE_KEY),
+                ])
 
-                if (profileRaw) {
-                    const profile = JSON.parse(profileRaw) as UserProfile
-                    setUserProfile(profile)
+                if (session?.user?.email) {
+                    try {
+                        const res = await getMe()
+                        const d = res?.data ?? (res as unknown as UserProfileDto)
+                        if (d && typeof d === 'object' && ('id' in d || 'email' in d)) {
+                            const u = d as UserProfileDto
+                            setUserProfile({
+                                activityLevel: 'medium',
+                                age: u.age ?? 0,
+                                dailyCalories: u.dailyCalorieTarget ?? 2000,
+                                dietPreference: 'none',
+                                email: u.email ?? session.user.email ?? '',
+                                gender:
+                                    (u.gender as UserProfile['gender']) ?? 'other',
+                                goal:
+                                    (u.goal as UserProfile['goal']) ?? 'maintain',
+                                height: u.heightCm ?? 0,
+                                weight: u.weightKg ?? 0,
+                            })
+                        } else if (profileRaw) {
+                            setUserProfile(JSON.parse(profileRaw) as UserProfile)
+                        }
+                    } catch {
+                        if (profileRaw) {
+                            setUserProfile(JSON.parse(profileRaw) as UserProfile)
+                        }
+                    }
+                } else if (profileRaw) {
+                    setUserProfile(JSON.parse(profileRaw) as UserProfile)
                 }
 
                 if (onboardingRaw === 'false') {
@@ -138,89 +156,87 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         void restoreSession()
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUserEmail(session?.user?.email ?? null)
+        })
+        return () => {
+            subscription.unsubscribe()
+        }
     }, [])
 
     const login = useCallback(
         async (email: string, password: string): Promise<AuthActionResult> => {
-            void password
             const normalizedEmail = email.trim().toLowerCase()
-            try {
-                const sessionEmail =
-                    normalizedEmail || `mock-user-${Date.now()}@foodprint.local`
-                const session: StoredSession = { email: sessionEmail }
-                await AsyncStorage.setItem(
-                    AUTH_SESSION_KEY,
-                    JSON.stringify(session)
-                )
-                setUserEmail(sessionEmail)
-                setHasCompletedOnboarding(true)
-                await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
-
-                return { success: true }
-            } catch {
-                const fallbackEmail =
-                    normalizedEmail || `mock-user-${Date.now()}@foodprint.local`
-                setUserEmail(fallbackEmail)
-                setHasCompletedOnboarding(true)
-                return { success: true }
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: normalizedEmail,
+                password,
+            })
+            if (error) {
+                const msg =
+                    /network|fetch|failed|connection/i.test(error.message)
+                        ? 'Network error. Check your connection and try again.'
+                        : error.message || 'Login failed'
+                return { success: false, message: msg }
             }
+            setUserEmail(data.user?.email ?? normalizedEmail)
+            setHasCompletedOnboarding(true)
+            await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
+            return { success: true }
         },
         []
     )
 
     const register = useCallback(
         async (email: string, password: string): Promise<AuthActionResult> => {
-            const normalizedEmail =
-                email.trim().toLowerCase() || `mock-user-${Date.now()}@foodprint.local`
-            const normalizedPassword = password || 'mock-password'
-
-            try {
-                const user: StoredUser = {
-                    email: normalizedEmail,
-                    password: normalizedPassword,
-                }
-                const session: StoredSession = {
-                    email: normalizedEmail,
-                }
-
-                await Promise.all([
-                    AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(user)),
-                    AsyncStorage.setItem(
-                        AUTH_SESSION_KEY,
-                        JSON.stringify(session)
-                    ),
-                    AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'false'),
-                ])
-                setUserEmail(normalizedEmail)
-                setHasCompletedOnboarding(false)
-                setUserProfile(null)
-
-                return { success: true }
-            } catch {
-                setUserEmail(normalizedEmail)
-                setHasCompletedOnboarding(false)
-                setUserProfile(null)
-                return { success: true }
+            const normalizedEmail = email.trim().toLowerCase()
+            const { data, error } = await supabase.auth.signUp({
+                email: normalizedEmail,
+                password,
+            })
+            if (error) {
+                const msg =
+                    /network|fetch|failed|connection/i.test(error.message)
+                        ? 'Network error. Check your connection and try again.'
+                        : error.message || 'Registration failed'
+                return { success: false, message: msg }
             }
+            if (!data.session) {
+                return {
+                    success: true,
+                    message: 'Please check your email and click the link to verify your account',
+                }
+            }
+            const sessionEmail = data.user?.email ?? normalizedEmail
+            setUserEmail(sessionEmail)
+            setHasCompletedOnboarding(false)
+            setUserProfile(null)
+            await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'false')
+            return { success: true }
         },
         []
     )
 
     const logout = useCallback(async () => {
-        // 先更新内存态，确保 UI 立即回到未登录导航
         setHasCompletedOnboarding(true)
         setUserEmail(null)
         try {
+            await supabase.auth.signOut()
             await AsyncStorage.removeItem(AUTH_SESSION_KEY)
         } catch {
-            // mock 场景下不阻塞退出流程
+            // 不阻塞退出流程
         }
     }, [])
 
     const updateProfile = useCallback(async (profile: UserProfile) => {
         setUserProfile(profile)
         try {
-            await AsyncStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(profile))
+            await AsyncStorage.setItem(
+                AUTH_PROFILE_KEY,
+                JSON.stringify(profile)
+            )
         } catch {
             // profile 持久化失败不阻断 onboarding 流程
         }

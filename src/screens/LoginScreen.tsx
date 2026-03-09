@@ -149,9 +149,6 @@ export function LoginScreen({ navigation }: Props) {
 
                 <View style={[styles.formCard, themedStyles.formCard]}>
                     <Text style={styles.formTitle}>Welcome Back</Text>
-                    <Text style={styles.mockHint}>
-                        Mock login: any email and password will work
-                    </Text>
 
                     {error ? (
                         <View style={[styles.errorBox, themedStyles.errorBox]}>
@@ -215,7 +212,7 @@ export function LoginScreen({ navigation }: Props) {
                     </Button>
 
                     <View style={styles.registerRow}>
-                        <Text>Don\'t have an account?</Text>
+                        <Text>Don&apos;t have an account?</Text>
                         <Button
                             compact
                             mode="text"

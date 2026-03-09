@@ -59,16 +59,42 @@ export function RegisterScreen({ navigation }: Props) {
     const passwordStrength = evaluatePasswordStrength(password)
 
     const onRegister = async () => {
-        // Dismiss keyboard to release iOS credential focus before navigating to Onboarding
         Keyboard.dismiss()
+        setError('')
+
+        if (!email.trim()) {
+            setError('Please enter your email')
+            return
+        }
+        if (!isValidEmail(email)) {
+            setError('Please enter a valid email address')
+            return
+        }
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters with upper, lower, number and special character')
+            return
+        }
+        if (!passwordStrength.isStrong) {
+            setError('Please meet all password requirements (8+ chars, upper, lower, number, special character)')
+            return
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match')
+            return
+        }
 
         setSubmitting(true)
-        setError('')
         const result = await register(email, password)
+        setSubmitting(false)
+
         if (!result.success) {
             setError(result.message ?? 'Registration failed')
+            return
         }
-        setSubmitting(false)
+        if (result.message && result.message.includes('verify your email')) {
+            setError(result.message)
+            return
+        }
     }
 
     return (
