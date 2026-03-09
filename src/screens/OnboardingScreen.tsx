@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     TextInput as RNTextInput,
@@ -55,6 +56,7 @@ export function OnboardingScreen() {
         useAuth()
     const [step, setStep] = useState(1)
     const [submitting, setSubmitting] = useState(false)
+    const [apiError, setApiError] = useState('')
 
     const [goal, setGoal] = useState<'lose' | 'maintain' | 'gain'>(
         userProfile?.goal ?? 'lose'
@@ -133,21 +135,55 @@ export function OnboardingScreen() {
     const onNext = async () => {
         if (step < TOTAL_STEPS) {
             setStep((prev) => prev + 1)
+            setApiError('')
             return
         }
 
         setSubmitting(true)
-        await updateProfile({
+        setApiError('')
+
+        const heightCm = toNumber(height)
+        const weightKg = toNumber(weight)
+        const ageYears = toNumber(age)
+        const dailyCal = calculateDailyCalories()
+        const profilePayload = {
             activityLevel,
-            age: toNumber(age),
-            dailyCalories: calculateDailyCalories(),
+            age: ageYears,
+            dailyCalories: dailyCal,
             dietPreference,
             email: userEmail ?? '',
             gender,
             goal,
-            height: toNumber(height),
-            weight: toNumber(weight),
-        })
+            height: heightCm,
+            weight: weightKg,
+        }
+
+        // TODO: 后端接口就绪后取消注释并恢复调用
+        // try {
+        //     const res = await updateBodyData({
+        //         age: ageYears,
+        //         dailyCalorieTarget: dailyCal,
+        //         gender,
+        //         goal,
+        //         heightCm,
+        //         weightKg,
+        //     })
+        //     if (res.code !== undefined && res.code !== 200) {
+        //         setApiError(res.message || 'Failed to save profile')
+        //         setSubmitting(false)
+        //         return
+        //     }
+        // } catch (e) {
+        //     const message =
+        //         e && typeof e === 'object' && 'message' in e
+        //             ? String((e as Error).message)
+        //             : 'Failed to save profile. Check your connection.'
+        //     setApiError(message)
+        //     setSubmitting(false)
+        //     return
+        // }
+
+        await updateProfile(profilePayload)
         await completeOnboarding()
         setSubmitting(false)
     }
@@ -182,7 +218,7 @@ export function OnboardingScreen() {
 
                 <View style={[styles.card, themedStyles.card]}>
                     {step === 1 ? (
-                        <>
+                        <View collapsable={false} style={styles.stepOptionWrapper}>
                             <Text style={styles.title}>{"What's your goal?"}</Text>
                             <Text style={styles.subtitle}>
                                 {"We'll tailor calorie suggestions to your goal"}
@@ -210,11 +246,11 @@ export function OnboardingScreen() {
                                     </View>
                                 </Button>
                             ))}
-                        </>
+                        </View>
                     ) : null}
 
                     {step === 2 ? (
-                        <>
+                        <View collapsable={false} style={styles.stepOptionWrapper}>
                             <Text style={styles.title}>{"What's your gender?"}</Text>
                             <Text style={styles.subtitle}>
                                 Helps us estimate your calorie needs more accurately
@@ -231,10 +267,12 @@ export function OnboardingScreen() {
                                             : themedStyles.unselected,
                                     ]}
                                 >
-                                    <Text>{item.label}</Text>
+                                    <Text style={styles.optionLabel}>
+                                        {item.label}
+                                    </Text>
                                 </Button>
                             ))}
-                        </>
+                        </View>
                     ) : null}
 
                     {step === 3 ? (
@@ -288,7 +326,7 @@ export function OnboardingScreen() {
                     ) : null}
 
                     {step === 4 ? (
-                        <>
+                        <View collapsable={false} style={styles.stepOptionWrapper}>
                             <Text style={styles.title}>How active are you?</Text>
                             <Text style={styles.subtitle}>
                                 More activity usually means higher daily calories
@@ -316,48 +354,59 @@ export function OnboardingScreen() {
                                     </View>
                                 </Button>
                             ))}
-                        </>
+                        </View>
                     ) : null}
 
                     {step === 5 ? (
-                        <>
+                        <View collapsable={false} style={styles.step5Wrapper}>
                             <Text style={styles.title}>Dietary preferences?</Text>
                             <Text style={styles.subtitle}>
                                 {"We'll tailor recommendations to your needs"}
                             </Text>
-                            <View style={styles.dietGrid}>
-                                {DIET_PREFERENCES.map((item) => (
-                                    <Button
-                                        key={item.value}
-                                        mode="outlined"
-                                        onPress={() =>
-                                            setDietPreference(item.value)
-                                        }
-                                        contentStyle={styles.dietButtonContent}
-                                        style={[
-                                            styles.dietButton,
-                                            dietPreference === item.value
-                                                ? themedStyles.selected
-                                                : themedStyles.unselected,
-                                        ]}
-                                    >
-                                        <View style={styles.dietInner}>
-                                            <MaterialCommunityIcons
-                                                color="#5F7B5C"
-                                                name={item.icon}
-                                                size={20}
-                                            />
-                                            <Text style={styles.dietLabel}>
+                            <View collapsable={false} style={styles.dietGrid}>
+                                {DIET_PREFERENCES.map((item) => {
+                                    const isSelected =
+                                        dietPreference === item.value
+                                    return (
+                                        <Pressable
+                                            key={item.value}
+                                            onPress={() =>
+                                                setDietPreference(item.value)
+                                            }
+                                            style={[
+                                                styles.dietButton,
+                                                isSelected
+                                                    ? themedStyles.selected
+                                                    : themedStyles.unselected,
+                                            ]}
+                                        >
+                                            <View style={styles.dietIconBox}>
+                                                <MaterialCommunityIcons
+                                                    color="#5F7B5C"
+                                                    name={item.icon}
+                                                    size={20}
+                                                />
+                                            </View>
+                                            <Text
+                                                numberOfLines={2}
+                                                style={styles.dietLabel}
+                                            >
                                                 {item.label}
                                             </Text>
-                                        </View>
-                                    </Button>
-                                ))}
+                                        </Pressable>
+                                    )
+                                })}
                             </View>
                             <Text style={styles.calorieHint}>
                                 Estimated daily calories: {calculateDailyCalories()} kcal
                             </Text>
-                        </>
+                        </View>
+                    ) : null}
+
+                    {apiError ? (
+                        <View style={styles.apiErrorBox}>
+                            <Text style={styles.apiErrorText}>{apiError}</Text>
+                        </View>
                     ) : null}
 
                     <View style={styles.footerButtons}>
@@ -385,6 +434,16 @@ export function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+    apiErrorBox: {
+        backgroundColor: '#FFEBEE',
+        borderRadius: 12,
+        marginTop: 10,
+        padding: 12,
+    },
+    apiErrorText: {
+        color: '#B71C1C',
+        fontSize: 13,
+    },
     calorieHint: {
         marginTop: 10,
         textAlign: 'center',
@@ -405,25 +464,32 @@ const styles = StyleSheet.create({
         paddingVertical: 24,
     },
     dietButton: {
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        borderRadius: 4,
+        borderWidth: 1,
+        justifyContent: 'center',
         marginBottom: 10,
         minHeight: 56,
+        paddingVertical: 8,
         width: '48%',
-    },
-    dietButtonContent: {
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     dietGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         marginBottom: 6,
+        width: '100%',
     },
-    dietInner: {
+    dietIconBox: {
         alignItems: 'center',
-        gap: 6,
+        height: 24,
+        justifyContent: 'center',
+        marginBottom: 4,
+        width: 24,
     },
     dietLabel: {
+        color: '#1C1B1F',
         fontSize: 12,
         textAlign: 'center',
     },
@@ -439,6 +505,7 @@ const styles = StyleSheet.create({
     },
     optionButton: {
         alignSelf: 'stretch',
+        backgroundColor: '#FFF',
         marginBottom: 10,
     },
     optionButtonContent: {
@@ -452,11 +519,13 @@ const styles = StyleSheet.create({
         alignSelf: 'stretch',
     },
     optionDesc: {
+        color: '#49454F',
         fontSize: 13,
         marginTop: 2,
         opacity: 0.9,
     },
     optionLabel: {
+        color: '#1C1B1F',
         fontWeight: '600',
     },
     page: {
@@ -493,6 +562,12 @@ const styles = StyleSheet.create({
     },
     step3Wrapper: {
         marginBottom: 0,
+    },
+    step5Wrapper: {
+        width: '100%',
+    },
+    stepOptionWrapper: {
+        width: '100%',
     },
     subtitle: {
         marginBottom: 14,
