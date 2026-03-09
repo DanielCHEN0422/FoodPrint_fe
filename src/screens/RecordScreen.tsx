@@ -6,13 +6,13 @@ import {
     Alert,
     Modal,
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
 
@@ -489,7 +489,6 @@ const styles = StyleSheet.create({
     safe: {
         backgroundColor: COLORS.bg,
         flex: 1,
-        paddingTop: 0, // SafeAreaView 会自动处理状态栏
     },
     scroll: {
         flex: 1,
@@ -499,11 +498,11 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
 
-    // ── Header - 添加适当的padding避免遮挡 ──
+    // ── Header - 修复顶部被遮挡问题 ──
     headerContainer: {
         backgroundColor: COLORS.card,
         paddingHorizontal: 16,
-        paddingTop: 8, // 增加顶部padding避免被状态栏遮挡
+        paddingTop: 4,
         paddingBottom: 16,
         marginBottom: 20,
     },
