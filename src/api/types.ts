@@ -97,15 +97,40 @@ export interface AnalyzeRequest {
     userContext?: UserNutritionContext
 }
 
+export interface FoodNutritionDetail {
+    nameEn?: string
+    nameZh?: string
+    portionAmount?: number
+    portionUnit?: string
+    calories?: number
+    proteinG?: number
+    fatG?: number
+    carbsG?: number
+    fiberG?: number
+    dataSource?: string
+    flagged?: boolean
+    flagReason?: string
+}
+
+export interface MealSummary {
+    totalCalories?: number
+    totalProteinG?: number
+    totalFatG?: number
+    totalCarbsG?: number
+    totalFiberG?: number
+    foodCount?: number
+}
+
 export interface FoodAnalysisResult {
-    recognizedFoods?: string[]
-    nutrition?: NutritionDataDto
-    suggestion?: string
+    foods?: FoodNutritionDetail[]
+    summary?: MealSummary
+    confidence?: number
 }
 
 export interface AIResponseDto {
-    type?: 'food_log' | 'diet_advice' | 'chat'
+    type?: 'FOOD_ANALYSIS' | 'DIET_ADVICE' | 'DIET_PLAN' | 'DIET_ROAST' | 'CHAT' | 'PROFILE_NEEDED'
     foodAnalysis?: FoodAnalysisResult
-    message?: string
-    [key: string]: unknown
+    adviceText?: string
+    profileIncomplete?: boolean
+    profilePrompt?: string
 }
