@@ -5,7 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { useTheme } from 'react-native-paper'
 
 import { useAuth } from '../context/AuthContext'
-import { CommunityScreen } from '../screens/CommunityScreen'
+import { CommunityScreen } from '../screens/Community'
 import { HomeScreen } from '../screens/HomeScreen'
 import { LoginScreen } from '../screens/LoginScreen'
 import { OnboardingScreen } from '../screens/OnboardingScreen'
