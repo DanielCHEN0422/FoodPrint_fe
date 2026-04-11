@@ -16,6 +16,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { StreamingAssistantMarkdown } from '../components/common/StreamingAssistantMarkdown'
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
 import { analyze, analyzeImage as apiAnalyzeImage } from '../api/ai'
 import { useAuth } from '../context/AuthContext'
@@ -49,15 +50,6 @@ interface ChatMessage {
 const EXAMPLE_DESCRIPTIONS = [
     'Lunch: Caesar salad with grilled chicken breast, olive oil dressing',
     'Dinner: One bowl of brown rice, steamed fish, stir-fried vegetables',
-]
-
-const MOCK_CHAT_MESSAGES: ChatMessage[] = [
-    {
-        id: '1',
-        text: "Hi! I'm your FoodPrint assistant. How can I help with your meals today?",
-        sender: 'assistant',
-        timestamp: new Date(),
-    },
 ]
 
 // ─── Handlers ────────────────────────────────────────────────
@@ -113,17 +105,36 @@ function ChatModal({
                                         message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
                                     ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.messageText,
-                                            message.sender === 'user' ? styles.userText : styles.assistantText,
-                                        ]}
-                                    >
-                                        {message.text}
-                                    </Text>
+                                    {message.sender === 'user' ? (
+                                        <Text style={[styles.messageText, styles.userText]}>
+                                            {message.text}
+                                        </Text>
+                                    ) : (
+                                        <StreamingAssistantMarkdown
+                                            markdown={message.text}
+                                            textColor={COLORS.dark}
+                                            linkColor={COLORS.primary}
+                                        />
+                                    )}
                                 </View>
                             </View>
                         ))}
+                        {sending ? (
+                            <View style={[styles.messageContainer, styles.assistantMessage]}>
+                                <View
+                                    style={[
+                                        styles.messageBubble,
+                                        styles.assistantBubble,
+                                        styles.thinkingBubble,
+                                    ]}
+                                >
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                    <Text style={[styles.messageText, styles.assistantText, styles.thinkingLabel]}>
+                                        Thinking...
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : null}
                     </ScrollView>
 
                     {/* Input Area */}
@@ -188,7 +199,7 @@ export function RecordScreen() {
     // Chat-related state
     const [chatVisible, setChatVisible] = useState(false)
     const [chatInput, setChatInput] = useState('')
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
     const [sendingMessage, setSendingMessage] = useState(false)
     
     // ─── Photo/Gallery Handlers ─────────────────────
@@ -1031,6 +1042,16 @@ const styles = StyleSheet.create({
     },
     assistantText: {
         color: COLORS.dark,
+    },
+    thinkingBubble: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        minWidth: 120,
+    },
+    thinkingLabel: {
+        fontSize: 14,
+        opacity: 0.85,
     },
     chatInputArea: {
         alignItems: 'flex-end',
