@@ -134,16 +134,11 @@ export const useCommunityState = () => {
             )
         )
 
-        const numericId = Number(postId)
-        if (Number.isNaN(numericId)) {
-            return
-        }
-
         try {
             if (wasLiked) {
-                await unlikePost(numericId)
+                await unlikePost(postId)
             } else {
-                await likePost(numericId)
+                await likePost(postId)
             }
         } catch (error) {
             // 回滚 optimistic 更新
@@ -168,36 +163,39 @@ export const useCommunityState = () => {
             return
         }
 
-        const numericId = Number(postId)
-        if (Number.isNaN(numericId)) {
-            console.warn(`⚠️ Skip comment: post id is not numeric (${postId})`)
-            return
+        try {
+            const response = await addComment(postId, { content: text })
+            const dto = response.data as any
+
+            if (!dto) {
+                console.warn('⚠️ Comment response is empty')
+                return
+            }
+
+            setPosts(
+                posts.map((post) => {
+                    if (post.id !== postId) {
+                        return post
+                    }
+
+                    const newComment: Comment = {
+                        id: String(dto.id ?? Date.now()),
+                        authorName: dto.authorNickname || 'You',
+                        authorImage: dto.authorAvatarUrl || 'https://i.pravatar.cc/32?img=2',
+                        text,
+                        timestamp: dto.createdAt || 'Just now',
+                    }
+
+                    return {
+                        ...post,
+                        comments: post.comments + 1,
+                        commentList: [...(post.commentList || []), newComment],
+                    }
+                })
+            )
+        } catch (error) {
+            console.error('❌ Add comment failed:', error)
         }
-
-        const response = await addComment(numericId, { content: text })
-        const dto = response.data
-
-        setPosts(
-            posts.map((post) => {
-                if (post.id !== postId) {
-                    return post
-                }
-
-                const newComment: Comment = {
-                    id: String((dto as any)?.id ?? Date.now()),
-                    authorName: (dto as any)?.authorNickname || 'You',
-                    authorImage: (dto as any)?.authorAvatarUrl || 'https://i.pravatar.cc/32?img=2',
-                    text,
-                    timestamp: (dto as any)?.createdAt || 'Just now',
-                }
-
-                return {
-                    ...post,
-                    comments: post.comments + 1,
-                    commentList: [...(post.commentList || []), newComment],
-                }
-            })
-        )
     }
 
     const handleFollowUser = async (authorId: string) => {
@@ -216,6 +214,11 @@ export const useCommunityState = () => {
                 newFollowedUsers.add(authorId)
             }
             setFollowedUsers(newFollowedUsers)
+            
+            // Follow 后等待 500ms 确保后端处理完成，再刷新 following feed
+            setTimeout(async () => {
+                await handleLoadFollowingFeed()
+            }, 500)
         } catch (error) {
             console.error('❌ Follow operation failed:', error)
         }
@@ -239,6 +242,7 @@ export const useCommunityState = () => {
         try {
             const response = await getFollowingFeed()
             const postsArray = Array.isArray(response.data) ? response.data : []
+            console.log('Following feed loaded:', postsArray.length)
             const mappedPosts = postsArray.map(mapApiPostToUiPost)
             setFollowingFeed(mappedPosts)
         } catch (error) {
@@ -283,45 +287,12 @@ export const useCommunityState = () => {
             }
 
             const response = await createPost(requestPayload)
-            const postData = response.data
+            const postData = response.data as any
 
-            if (postData && typeof postData === 'object') {
-                const id = (postData as any).id
-                const userId = (postData as any).userId
-                const nickname = (postData as any).authorNickname
-                const avatarUrl = (postData as any).authorAvatarUrl
-                const imageUrl = (postData as any).imageUrl
-                const likeCount = (postData as any).likeCount
-                const comments = (postData as any).comments
-                const liked = (postData as any).likedByCurrentUser
-
-                const newPost: Post = {
-                    id: id?.toString() || Date.now().toString(),
-                    authorId: userId || 'current-user',
-                    authorName: nickname || 'You',
-                    authorImage: avatarUrl || 'https://i.pravatar.cc/48?img=0',
-                    timestamp: 'Just now',
-                    text: newPostData.text,
-                    image: newPostData.image || imageUrl || '',
-                    likes: likeCount || 0,
-                    comments: Array.isArray(comments) ? comments.length : 0,
-                    userLiked: liked || false,
-                }
+            if (postData && postData.id) {
+                // 用统一的转换函数
+                const newPost = mapApiPostToUiPost(postData as PostResponse)
                 setPosts([newPost, ...posts])
-            } else {
-                const tempPost: Post = {
-                    id: Date.now().toString(),
-                    authorId: 'current-user',
-                    authorName: 'You',
-                    authorImage: 'https://i.pravatar.cc/48?img=0',
-                    timestamp: 'Just now',
-                    text: newPostData.text,
-                    image: newPostData.image,
-                    likes: 0,
-                    comments: 0,
-                    userLiked: false,
-                }
-                setPosts([tempPost, ...posts])
             }
 
             setShowCreatePost(false)

@@ -29,19 +29,19 @@ export async function getFeed(page = 0, size = 10): Promise<ApiResponse<PostResp
 
 /** POST /api/community/posts/{id}/comments - 添加评论 */
 export async function addComment(
-    postId: number,
+    postId: string | number,
     body: CreateCommentRequest
 ): Promise<ApiResponse<CommentResponse>> {
     return apiPost<CommentResponse>(`${BASE}/posts/${postId}/comments`, body, { requireAuth: true })
 }
 
 /** POST /api/community/posts/{id}/like - 点赞帖子 */
-export async function likePost(postId: number): Promise<ApiResponse<unknown>> {
+export async function likePost(postId: string | number): Promise<ApiResponse<unknown>> {
     return apiPost(`${BASE}/posts/${postId}/like`, undefined, { requireAuth: true })
 }
 
 /** DELETE /api/community/posts/{id}/like - 取消点赞 */
-export async function unlikePost(postId: number): Promise<ApiResponse<unknown>> {
+export async function unlikePost(postId: string | number): Promise<ApiResponse<unknown>> {
     return apiDelete(`${BASE}/posts/${postId}/like`, { requireAuth: true })
 }
 

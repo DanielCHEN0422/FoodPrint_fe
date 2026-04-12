@@ -102,14 +102,20 @@ export function CreatePostModal({
         onClose()
     }
 
-    const handleCreatePostSubmit = () => {
-        if (postText.trim()) {
-            onSubmit({
+    const handleCreatePostSubmit = async () => {
+        if (!postText.trim()) {
+            return
+        }
+
+        try {
+            await onSubmit({
                 text: postText,
                 image: selectedImage,
             })
             setPostText('')
             setSelectedImage('')
+        } catch (error) {
+            console.error('❌ Create post error:', error)
         }
     }
 
