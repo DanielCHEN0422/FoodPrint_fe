@@ -1,12 +1,14 @@
 import { Platform } from 'react-native'
 
 import { API_BASE_URL } from '../lib/env'
-import { getSupabaseAccessToken } from '../lib/supabase'
+import { getSupabaseAccessToken, supabase } from '../lib/supabase'
 import type { ApiResponse } from './types'
 
 const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
 }
+
+type ApiRequestOptions = RequestInit & { skipAuth?: boolean; requireAuth?: boolean }
 
 export function getEffectiveBaseUrl(): string {
     const base = API_BASE_URL.replace(/\/$/, '')
@@ -16,15 +18,81 @@ export function getEffectiveBaseUrl(): string {
     return base
 }
 
+async function resolveAccessToken(): Promise<string | null> {
+    let token = await getSupabaseAccessToken()
+    if (token) {
+        return token
+    }
+
+    const { error } = await supabase.auth.refreshSession()
+    if (!error) {
+        token = await getSupabaseAccessToken()
+    }
+    return token
+}
+
+async function parseApiResponse<T>(res: Response): Promise<ApiResponse<T>> {
+    const raw = await res.text()
+    const trimmed = raw.trim()
+
+    if (!trimmed) {
+        return {
+            code: res.status,
+            message: res.ok ? 'success' : res.statusText,
+            data: null,
+        }
+    }
+
+    try {
+        const parsed = JSON.parse(trimmed) as unknown
+
+        if (
+            parsed &&
+            typeof parsed === 'object' &&
+            'code' in parsed &&
+            'message' in parsed &&
+            'data' in parsed
+        ) {
+            return parsed as ApiResponse<T>
+        }
+
+        if (
+            parsed &&
+            typeof parsed === 'object' &&
+            'success' in parsed &&
+            typeof (parsed as { success?: unknown }).success === 'boolean'
+        ) {
+            const ok = (parsed as { success: boolean }).success
+            return {
+                code: res.status,
+                message: ok ? 'success' : 'failed',
+                data: parsed as T,
+            }
+        }
+
+        return {
+            code: res.status,
+            message: res.ok ? 'success' : res.statusText,
+            data: parsed as T,
+        }
+    } catch {
+        return {
+            code: res.status,
+            message: trimmed || res.statusText,
+            data: null,
+        }
+    }
+}
+
 /**
  * 带 JWT 的请求：自动附加 Authorization: Bearer <supabase_jwt>
  * 用于调用后端 Spring Boot API（OAuth2 Resource Server + JWKS）
  */
 export async function apiRequest<T = unknown>(
     path: string,
-    options: RequestInit & { skipAuth?: boolean } = {}
+    options: ApiRequestOptions = {}
 ): Promise<ApiResponse<T>> {
-    const { skipAuth, ...fetchOptions } = options
+    const { skipAuth, requireAuth, ...fetchOptions } = options
     const baseUrl = getEffectiveBaseUrl()
     const url = `${baseUrl}/${path.replace(/^\//, '')}`
     const headers: Record<string, string> = {
@@ -34,19 +102,39 @@ export async function apiRequest<T = unknown>(
             : {}),
     }
 
+    console.log(`📡 API Request: ${fetchOptions.method || 'GET'} ${url}`)
+
+    const requestToken = !skipAuth ? await resolveAccessToken() : null
+
     if (!skipAuth) {
-        const token = await getSupabaseAccessToken()
+        const token = requestToken
+        console.log('🔐 Token retrieved:', token ? `${token.substring(0, 20)}...` : 'null')
         if (token) {
             headers['Authorization'] = `Bearer ${token}`
+            console.log('✅ Authorization header set')
+        } else if (requireAuth) {
+            throw new ApiError(401, 'This endpoint requires login. Please sign in and try again.', {
+                code: 401,
+                message: 'Unauthorized: missing Bearer token',
+                data: null,
+            })
+        } else {
+            console.warn('⚠️ No token available, request will be sent without Authorization header')
         }
+    } else {
+        console.log('⏭️ skipAuth: true - 跳过 JWT 认证')
+    }
+
+    const doFetch = async (requestHeaders: HeadersInit): Promise<Response> => {
+        return fetch(url, {
+            ...fetchOptions,
+            headers: requestHeaders,
+        })
     }
 
     let res: Response
     try {
-        res = await fetch(url, {
-            ...fetchOptions,
-            headers: { ...headers, ...fetchOptions.headers } as HeadersInit,
-        })
+        res = await doFetch({ ...headers, ...fetchOptions.headers } as HeadersInit)
     } catch (e) {
         const msg =
             e instanceof TypeError && (e.message === 'Network request failed' || e.message === 'Failed to fetch')
@@ -57,33 +145,45 @@ export async function apiRequest<T = unknown>(
         throw new ApiError(0, msg, undefined)
     }
 
-    let body: ApiResponse<T>
-    const contentType = res.headers.get('content-type')
-    if (contentType?.includes('application/json')) {
-        body = (await res.json()) as ApiResponse<T>
-    } else {
-        const text = await res.text()
-        body = {
-            code: res.status,
-            message: text || res.statusText,
-            data: null,
-        } as ApiResponse<T>
+    if (res.status === 401 && !skipAuth) {
+        const refreshedToken = await resolveAccessToken()
+        if (refreshedToken && refreshedToken !== requestToken) {
+            const retryHeaders: HeadersInit = {
+                ...headers,
+                ...fetchOptions.headers,
+                Authorization: `Bearer ${refreshedToken}`,
+            }
+            try {
+                res = await doFetch(retryHeaders)
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : 'Network request failed during auth retry'
+                throw new ApiError(0, msg, undefined)
+            }
+        }
     }
 
+    const body = await parseApiResponse<T>(res)
+
     if (!res.ok) {
-        throw new ApiError(res.status, body.message, body)
+        const responseMessage = typeof body.message === 'string' ? body.message.trim() : ''
+        const errorMessage =
+            responseMessage ||
+            (res.status === 401 && requestToken
+                ? 'Unauthorized: token was sent but rejected by backend. Check backend SUPABASE_URL/JWKS and token issuer.'
+                : res.statusText || `HTTP ${res.status}`)
+        throw new ApiError(res.status, errorMessage, body)
     }
 
     return body
 }
 
 /** 便于 GET 请求 */
-export function apiGet<T>(path: string, options?: RequestInit) {
+export function apiGet<T>(path: string, options?: ApiRequestOptions) {
     return apiRequest<T>(path, { ...options, method: 'GET' })
 }
 
 /** 便于 POST 请求 */
-export function apiPost<T>(path: string, body?: unknown, options?: RequestInit) {
+export function apiPost<T>(path: string, body?: unknown, options?: ApiRequestOptions) {
     return apiRequest<T>(path, {
         ...options,
         method: 'POST',
@@ -92,7 +192,7 @@ export function apiPost<T>(path: string, body?: unknown, options?: RequestInit) 
 }
 
 /** 便于 PUT 请求 */
-export function apiPut<T>(path: string, body?: unknown, options?: RequestInit) {
+export function apiPut<T>(path: string, body?: unknown, options?: ApiRequestOptions) {
     return apiRequest<T>(path, {
         ...options,
         method: 'PUT',
@@ -101,7 +201,7 @@ export function apiPut<T>(path: string, body?: unknown, options?: RequestInit) {
 }
 
 /** 便于 DELETE 请求 */
-export function apiDelete<T>(path: string, options?: RequestInit) {
+export function apiDelete<T>(path: string, options?: ApiRequestOptions) {
     return apiRequest<T>(path, { ...options, method: 'DELETE' })
 }
 
