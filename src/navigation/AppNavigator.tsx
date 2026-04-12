@@ -7,11 +7,13 @@ import { useTheme } from 'react-native-paper'
 import { useAuth } from '../context/AuthContext'
 import { CommunityScreen } from '../screens/Community'
 import { HomeScreen } from '../screens/HomeScreen'
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen'
 import { LoginScreen } from '../screens/LoginScreen'
 import { OnboardingScreen } from '../screens/OnboardingScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { RecordScreen } from '../screens/RecordScreen'
 import { RegisterScreen } from '../screens/RegisterScreen'
+import { SetNewPasswordScreen } from '../screens/SetNewPasswordScreen'
 import type { AuthStackParamList, RootTabParamList } from './types'
 
 const Tab = createBottomTabNavigator<RootTabParamList>()
@@ -112,13 +114,26 @@ function AuthNavigator() {
         >
             <AuthStack.Screen name="Login" component={LoginScreen} />
             <AuthStack.Screen name="Register" component={RegisterScreen} />
+            <AuthStack.Screen
+                name="ForgotPassword"
+                component={ForgotPasswordScreen}
+            />
+            <AuthStack.Screen
+                name="SetNewPassword"
+                component={SetNewPasswordScreen}
+            />
         </AuthStack.Navigator>
     )
 }
 
 export function AppNavigator() {
     const theme = useTheme()
-    const { hasCompletedOnboarding, isAuthenticated, isLoading } = useAuth()
+    const {
+        hasCompletedOnboarding,
+        isAuthenticated,
+        isLoading,
+        isPasswordRecovery,
+    } = useAuth()
 
     if (isLoading) {
         return (
@@ -133,7 +148,7 @@ export function AppNavigator() {
         )
     }
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || isPasswordRecovery) {
         return <AuthNavigator />
     }
 
