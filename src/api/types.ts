@@ -50,6 +50,7 @@ export interface CreateFoodLogRequest {
 export interface NutritionDataDto {
     calories?: number
     protein?: number
+    proteinG?: number
     fat?: number
     carbs?: number
     fiber?: number
@@ -80,6 +81,21 @@ export interface TodaySummaryDto {
     totalCarbs?: number
     logCount?: number
 }
+
+/** 单日柱状图数据（周概览接口） */
+export interface DailyCalorieBarDto {
+    date: string
+    totalCalories: number
+    totalProtein?: number
+    totalFat?: number
+    totalCarbs?: number
+    logCount?: number
+}
+
+/**
+ * GET /api/food-logs/weekly-overview 的 data 可能是数组或带 days 字段的对象
+ */
+export type WeeklyOverviewPayload = DailyCalorieBarDto[] | { days?: DailyCalorieBarDto[] }
 
 // ---------- AI 模块 ----------
 export interface UserNutritionContext {
