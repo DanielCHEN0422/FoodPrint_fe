@@ -60,7 +60,13 @@ export interface NutritionDataDto {
 export interface FoodLogDto {
     id: string
     userId: string
-    date: string
+    /** 后端当前返回的记账日期 */
+    logDate?: string
+    /** 用户输入 / AI 识别的原文 */
+    originalText?: string | null
+    aiConfidence?: number
+    /** 兼容旧字段 */
+    date?: string
     text?: string | null
     imageUrl?: string | null
     recognizedFoods?: string[]

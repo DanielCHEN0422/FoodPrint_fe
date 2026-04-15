@@ -80,26 +80,53 @@ export function mergeWeeklyIntoSlots(
     })
 }
 
-/** GET /api/food-logs/weekly-overview?endDate=YYYY-MM-DD */
+/**
+ * GET /api/food-logs/weekly-overview?endDate=YYYY-MM-DD
+ * Header: userId（Supabase auth user id，与 createFoodLog 一致）
+ */
 export async function getWeeklyOverview(
+    userId: string,
     endDate?: string
 ): Promise<ApiResponse<WeeklyOverviewPayload>> {
     const q = endDate ? `?endDate=${encodeURIComponent(endDate)}` : ''
-    return apiGet<WeeklyOverviewPayload>(`${BASE}/weekly-overview${q}`)
+    const path = `${BASE}/weekly-overview${q}`
+    const res = await apiGet<WeeklyOverviewPayload>(path, {
+        headers: { userId },
+    })
+    if (__DEV__) {
+        console.warn('[weekly-overview] response', {
+            code: res.code,
+            message: res.message,
+            data: res.data,
+        })
+    }
+    return res
 }
 
-/** POST /api/food-logs - 创建食物记录（调用 AI） */
+/**
+ * POST /api/food-logs - 创建食物记录（调用 AI）
+ * 后端要求 Header: userId（Supabase auth user id，与 JWT sub 一致）
+ */
 export async function createFoodLog(
-    body: CreateFoodLogRequest
+    body: CreateFoodLogRequest,
+    userId: string
 ): Promise<ApiResponse<FoodLogDto>> {
-    return apiPost<FoodLogDto>(BASE, body)
+    return apiPost<FoodLogDto>(BASE, body, {
+        headers: { userId },
+    })
 }
 
-/** GET /api/food-logs?date=YYYY-MM-DD - 按日期查询（后端 TODO 时可能 404） */
+/**
+ * GET /api/food-logs?date=YYYY-MM-DD - 按日期查询
+ * Header: userId（与 weekly-overview / create 一致）
+ */
 export async function getFoodLogsByDate(
+    userId: string,
     date: string
 ): Promise<ApiResponse<FoodLogDto[]>> {
-    return apiGet<FoodLogDto[]>(`${BASE}?date=${encodeURIComponent(date)}`)
+    return apiGet<FoodLogDto[]>(`${BASE}?date=${encodeURIComponent(date)}`, {
+        headers: { userId },
+    })
 }
 
 /** GET /api/food-logs/today/summary - 今日营养汇总（后端 TODO 时可能 404） */

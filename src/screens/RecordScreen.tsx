@@ -178,30 +178,30 @@ export function RecordScreen() {
     const { userProfile } = useAuth()
     const [activeMode, setActiveMode] = useState<RecordMode>('text')
     const [textInput, setTextInput] = useState('')
-    
+
     // Build userContext from profile for AI requests
     const userContext: UserNutritionContext | undefined = userProfile
         ? {
-              heightCm: userProfile.height,
-              weightKg: userProfile.weight,
-              age: userProfile.age,
-              gender: userProfile.gender,
-              goal: userProfile.goal,
-              dailyCalorieTarget: userProfile.dailyCalories,
-          }
+            heightCm: userProfile.height,
+            weightKg: userProfile.weight,
+            age: userProfile.age,
+            gender: userProfile.gender,
+            goal: userProfile.goal,
+            dailyCalorieTarget: userProfile.dailyCalories,
+        }
         : undefined
-    
+
     // Analysis-related state
     const [analyzing, setAnalyzing] = useState(false)
     const [analysisResult, setAnalysisResult] = useState<any>(null)
     const [analysisError, setAnalysisError] = useState<string | null>(null)
-    
+
     // Chat-related state
     const [chatVisible, setChatVisible] = useState(false)
     const [chatInput, setChatInput] = useState('')
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
     const [sendingMessage, setSendingMessage] = useState(false)
-    
+
     // ─── Photo/Gallery Handlers ─────────────────────
     const handleTakePhoto = async () => {
         try {
@@ -211,7 +211,7 @@ export function RecordScreen() {
                 Alert.alert('Permission denied', 'Camera permission is required to take photos')
                 return
             }
-            
+
             // Launch camera
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -219,7 +219,7 @@ export function RecordScreen() {
                 aspect: [4, 3],
                 quality: 1,
             })
-            
+
             if (!result.canceled && result.assets?.[0]?.uri) {
                 console.log('Photo taken:', result.assets[0].uri)
                 await handleImageAnalysis(result.assets[0].uri)
@@ -229,7 +229,7 @@ export function RecordScreen() {
             Alert.alert('Error', 'Failed to take photo')
         }
     }
-    
+
     const handleUploadFromGallery = async () => {
         try {
             // Request media library permission
@@ -238,7 +238,7 @@ export function RecordScreen() {
                 Alert.alert('Permission denied', 'Media library permission is required to access photos')
                 return
             }
-            
+
             // Open gallery
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -246,7 +246,7 @@ export function RecordScreen() {
                 aspect: [4, 3],
                 quality: 1,
             })
-            
+
             if (!result.canceled && result.assets?.[0]?.uri) {
                 console.log('Image selected:', result.assets[0].uri)
                 await handleImageAnalysis(result.assets[0].uri)
@@ -256,20 +256,20 @@ export function RecordScreen() {
             Alert.alert('Error', 'Failed to select image from gallery')
         }
     }
-    
+
     // ─── Chat Handlers ─────────────────────
     const handleChatPress = () => {
         setChatVisible(true)
     }
-    
+
     const handleCloseChat = () => {
         setChatVisible(false)
     }
-    
+
     const handleSendMessage = async () => {
         const messageText = chatInput.trim()
         if (!messageText) return
-        
+
         // Add user message immediately
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -280,7 +280,7 @@ export function RecordScreen() {
         setChatMessages(prev => [...prev, userMsg])
         setChatInput('')
         setSendingMessage(true)
-        
+
         try {
             const res = await analyze({ text: messageText, userContext })
             const data = res.data
@@ -417,7 +417,7 @@ export function RecordScreen() {
                         Text Description
                     </Text>
                 </Pressable>
-                
+
                 <Pressable
                     style={[
                         styles.segmentButton,
@@ -587,10 +587,10 @@ export function RecordScreen() {
                     <Text style={styles.cardTitle}>AI Smart Analysis</Text>
                 </View>
                 <Text style={styles.cardDescription}>
-                    Describe what you ate and AI will automatically calculate the 
+                    Describe what you ate and AI will automatically calculate the
                     nutritional content and calories
                 </Text>
-                
+
                 <TextInput
                     style={styles.textInput}
                     multiline
@@ -601,7 +601,7 @@ export function RecordScreen() {
                     onChangeText={setTextInput}
                     textAlignVertical="top"
                 />
-                
+
                 <Pressable
                     style={({ pressed }) => [
                         styles.analyzeButton,
@@ -627,7 +627,7 @@ export function RecordScreen() {
 
             {/* Example Descriptions */}
             <Text style={styles.exampleTitle}>Example descriptions:</Text>
-            
+
             {EXAMPLE_DESCRIPTIONS.map((example, index) => (
                 <View key={index} style={styles.exampleCard}>
                     <Text style={styles.exampleText}>{example}</Text>
@@ -654,7 +654,7 @@ export function RecordScreen() {
                     Take or upload a photo of your food, and AI will automatically
                     identify and analyze the nutritional content
                 </Text>
-                
+
                 {/* Action Buttons */}
                 <View style={styles.buttonContainer}>
                     <Pressable
@@ -667,7 +667,7 @@ export function RecordScreen() {
                         <Ionicons name="camera" size={20} color="#fff" />
                         <Text style={styles.primaryButtonText}>Take Photo</Text>
                     </Pressable>
-                    
+
                     <Pressable
                         style={({ pressed }) => [
                             styles.secondaryButton,
@@ -697,7 +697,7 @@ export function RecordScreen() {
                     />
                     <Text style={styles.cardTitle}>Recording Tips</Text>
                 </View>
-                
+
                 <View style={styles.tipsList}>
                     <View style={styles.tipItem}>
                         <View style={styles.bullet} />
@@ -750,7 +750,7 @@ export function RecordScreen() {
 
             {/* Floating Chat Button */}
             <FloatingChatButton onPress={handleChatPress} />
-            
+
             {/* Chat Modal */}
             <ChatModal
                 visible={chatVisible}

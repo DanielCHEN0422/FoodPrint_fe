@@ -29,7 +29,13 @@ import {
     parseWeeklyOverviewPayload,
     toYMD,
 } from '../api/food'
-import type { DailyCalorieBarDto, FoodLogDto, UserNutritionContext } from '../api/types'
+import type {
+    ApiResponse,
+    DailyCalorieBarDto,
+    FoodLogDto,
+    UserNutritionContext,
+    WeeklyOverviewPayload,
+} from '../api/types'
 import { StreamingAssistantMarkdown } from '../components/common/StreamingAssistantMarkdown'
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
 import { useAuth } from '../context/AuthContext'
@@ -62,7 +68,8 @@ interface MealItem {
     name: string
     mealType: string
     time: string
-    calories: number
+    /** 未估算出热量时省略，列表显示 — */
+    calories?: number
     icon: keyof typeof MaterialCommunityIcons.glyphMap
 }
 
@@ -77,13 +84,21 @@ const DEFAULT_CALORIE_GOAL = 2000
 
 function foodLogToMeal(log: FoodLogDto): MealItem {
     const n = log.nutritionData
-    const cal = Math.round(
-        n?.calories ?? (typeof log.todayCalories === 'number' ? log.todayCalories : 0)
-    )
+    const fromNutrition = n?.calories
+    const fromToday = log.todayCalories
+    let calories: number | undefined
+    if (typeof fromNutrition === 'number' && !Number.isNaN(fromNutrition)) {
+        calories = Math.round(fromNutrition)
+    } else if (typeof fromToday === 'number' && !Number.isNaN(fromToday)) {
+        calories = Math.round(fromToday)
+    }
+
     const rawName =
+        (log.originalText && log.originalText.trim()) ||
         (log.text && log.text.trim()) ||
         (log.recognizedFoods?.filter(Boolean).join(', ') || '')
     const name = rawName.length > 0 ? rawName : 'Food entry'
+
     let time = ''
     if (log.createdAt) {
         try {
@@ -95,13 +110,21 @@ function foodLogToMeal(log: FoodLogDto): MealItem {
             time = ''
         }
     }
+
+    const conf =
+        typeof log.aiConfidence === 'number' && log.aiConfidence >= 0 && log.aiConfidence <= 1
+            ? Math.round(log.aiConfidence * 100)
+            : null
+    const mealType =
+        conf != null ? `AI ${conf}%` : 'Logged'
+
     const short = name.length > 80 ? `${name.slice(0, 77)}...` : name
     return {
         id: log.id,
         name: short,
-        mealType: 'Logged',
+        mealType,
         time: time || '—',
-        calories: cal,
+        calories,
         icon: 'silverware-fork-knife',
     }
 }
@@ -143,8 +166,8 @@ function WeeklyCalorieHistogram({
                     const fillH = loading
                         ? 16
                         : bar.totalCalories > 0
-                          ? Math.max(10, ratio * barMaxH)
-                          : 6
+                            ? Math.max(10, ratio * barMaxH)
+                            : 6
                     const fillOpacity = loading ? 0.35 : bar.totalCalories > 0 ? 1 : 0.45
                     return (
                         <View key={bar.date} style={styles.histogramCol}>
@@ -266,7 +289,9 @@ function MealItemCard({ meal }: { meal: MealItem }) {
 
             {/* Calories */}
             <View style={styles.mealCalories}>
-                <Text style={styles.mealCalNum}>{meal.calories}</Text>
+                <Text style={styles.mealCalNum}>
+                    {meal.calories != null ? meal.calories : '—'}
+                </Text>
                 <Text style={styles.mealCalUnit}>cal</Text>
             </View>
         </View>
@@ -400,7 +425,7 @@ function ChatModal({
 // ─── Main Component ──────────────────────────────────────────
 export function HomeScreen() {
     const _navigation = useNavigation<HomeScreenNavigationProp>()
-    const { userProfile } = useAuth()
+    const { userProfile, authUserId } = useAuth()
 
     const calorieGoal = userProfile?.dailyCalories ?? DEFAULT_CALORIE_GOAL
 
@@ -472,7 +497,7 @@ export function HomeScreen() {
     )
 
     const totalFromLogs = useMemo(
-        () => meals.reduce((sum, m) => sum + m.calories, 0),
+        () => meals.reduce((sum, m) => sum + (m.calories ?? 0), 0),
         [meals]
     )
 
@@ -486,49 +511,72 @@ export function HomeScreen() {
 
     const remainingCalories = calorieGoal - totalCalories
 
-    const loadHomeData = useCallback(async (isPull = false) => {
+    const fetchHomePayload = useCallback(async () => {
         const end = new Date()
         const endStr = toYMD(end)
-        if (isPull) setRefreshing(true)
-        else {
-            setWeeklyLoading(true)
-            setLogsLoading(true)
+        const slots = buildLast7DaySlots(end)
+        const weeklyPromise: Promise<ApiResponse<WeeklyOverviewPayload>> = authUserId
+            ? getWeeklyOverview(authUserId, endStr)
+            : Promise.resolve({ code: 0, message: '', data: null })
+        const logsPromise: Promise<ApiResponse<FoodLogDto[]>> = authUserId
+            ? getFoodLogsByDate(authUserId, endStr)
+            : Promise.resolve({ code: 0, message: '', data: null })
+        const [weeklyRes, logsRes] = await Promise.allSettled([
+            weeklyPromise,
+            logsPromise,
+        ])
+
+        let weekly = slots
+        if (weeklyRes.status === 'fulfilled' && weeklyRes.value.data != null) {
+            weekly = mergeWeeklyIntoSlots(
+                slots,
+                parseWeeklyOverviewPayload(weeklyRes.value.data)
+            )
         }
 
-        try {
-            const [weeklyRes, logsRes] = await Promise.allSettled([
-                getWeeklyOverview(endStr),
-                getFoodLogsByDate(endStr),
-            ])
+        let logs: FoodLogDto[] = []
+        if (logsRes.status === 'fulfilled' && logsRes.value.data != null) {
+            const raw = logsRes.value.data
+            logs = Array.isArray(raw) ? raw : []
+        }
 
-            const slots = buildLast7DaySlots(end)
+        return { weekly, logs, end }
+    }, [authUserId])
 
-            if (weeklyRes.status === 'fulfilled' && weeklyRes.value.data != null) {
-                const parsed = parseWeeklyOverviewPayload(weeklyRes.value.data)
-                setWeeklyBars(mergeWeeklyIntoSlots(slots, parsed))
-            } else {
-                setWeeklyBars(slots)
+    /**
+     * pull: 仅控制 refreshing，避免与首屏 loading 共用 finally 把 refreshing 误清掉。
+     * 勿把 RefreshControl 的 onRefresh 直接设为 loadHomeData（会把 event 当成参数）。
+     */
+    const loadHomeData = useCallback(
+        async (opts?: { pull?: boolean }) => {
+            const isPull = opts?.pull === true
+            if (isPull) setRefreshing(true)
+            else {
+                setWeeklyLoading(true)
+                setLogsLoading(true)
             }
-
-            if (logsRes.status === 'fulfilled' && logsRes.value.data != null) {
-                const raw = logsRes.value.data
-                setTodayLogs(Array.isArray(raw) ? raw : [])
-            } else {
+            try {
+                const { weekly, logs, end } = await fetchHomePayload()
+                setWeeklyBars(weekly)
+                setTodayLogs(logs)
+            } catch {
+                const end = new Date()
+                setWeeklyBars(buildLast7DaySlots(end))
                 setTodayLogs([])
+            } finally {
+                if (isPull) setRefreshing(false)
+                else {
+                    setWeeklyLoading(false)
+                    setLogsLoading(false)
+                }
             }
-        } catch {
-            setWeeklyBars(buildLast7DaySlots(end))
-            setTodayLogs([])
-        } finally {
-            setWeeklyLoading(false)
-            setLogsLoading(false)
-            setRefreshing(false)
-        }
-    }, [])
+        },
+        [fetchHomePayload]
+    )
 
     useFocusEffect(
         useCallback(() => {
-            loadHomeData(false)
+            void loadHomeData()
         }, [loadHomeData])
     )
 
@@ -555,21 +603,28 @@ export function HomeScreen() {
             Alert.alert('Notice', 'Please describe what you ate')
             return
         }
+        if (!authUserId) {
+            Alert.alert('Error', 'Not signed in or user id missing. Please log in again.')
+            return
+        }
         setSavingLog(true)
         try {
-            await createFoodLog({
-                text,
-                date: toYMD(new Date()),
-            })
+            const created = await createFoodLog({ text }, authUserId)
             handleCloseAddMeal()
-            await loadHomeData(false)
+            await loadHomeData()
+            const row = created.data
+            if (row?.id) {
+                setTodayLogs((prev) =>
+                    prev.some((l) => l.id === row.id) ? prev : [row, ...prev]
+                )
+            }
         } catch (e: unknown) {
             const msg =
                 e instanceof ApiError
                     ? e.message
                     : e instanceof Error
-                      ? e.message
-                      : 'Could not save meal'
+                        ? e.message
+                        : 'Could not save meal'
             Alert.alert('Error', msg)
         } finally {
             setSavingLog(false)
@@ -648,7 +703,7 @@ export function HomeScreen() {
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
-                        onRefresh={() => loadHomeData(true)}
+                        onRefresh={() => void loadHomeData({ pull: true })}
                         tintColor={COLORS.primary}
                     />
                 }
@@ -715,9 +770,31 @@ export function HomeScreen() {
                 {/* ── Section Header ── */}
                 <View style={[styles.sectionHeader, { marginHorizontal: 16 }]}>
                     <Text style={styles.sectionTitle}>Today&apos;s Meals</Text>
-                    <Pressable onPress={handleViewAll}>
-                        <Text style={styles.viewAll}>View All</Text>
-                    </Pressable>
+                    <View style={styles.sectionHeaderRight}>
+                        <Pressable
+                            accessibilityLabel="Refresh food logs"
+                            disabled={refreshing}
+                            hitSlop={12}
+                            onPress={() => void loadHomeData({ pull: true })}
+                            style={({ pressed }) => [
+                                styles.refreshMealsBtn,
+                                pressed && styles.refreshMealsBtnPressed,
+                            ]}
+                        >
+                            {refreshing ? (
+                                <ActivityIndicator size="small" color={COLORS.primary} />
+                            ) : (
+                                <Ionicons
+                                    name="refresh"
+                                    size={22}
+                                    color={refreshing ? COLORS.sub : COLORS.primaryDark}
+                                />
+                            )}
+                        </Pressable>
+                        <Pressable onPress={handleViewAll}>
+                            <Text style={styles.viewAll}>View All</Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* ── Meal List (placeholder + data) ── */}
@@ -844,8 +921,8 @@ export function HomeScreen() {
 
                         <ScrollView style={styles.modalContent}>
                             <Text style={styles.formHint}>
-                                Describe what you ate. We&apos;ll send it to the server for AI
-                                analysis and save today&apos;s entry.
+                                Describe what you ate (e.g. &quot;One Apple&quot;). AI will process it
+                                and save the log for today.
                             </Text>
                             <View style={styles.formGroup}>
                                 <Text style={styles.formLabel}>Description</Text>
@@ -1094,10 +1171,21 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
+    sectionHeaderRight: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 14,
+    },
     sectionTitle: {
         color: COLORS.dark,
         fontSize: 17,
         fontWeight: '600',
+    },
+    refreshMealsBtn: {
+        padding: 4,
+    },
+    refreshMealsBtnPressed: {
+        opacity: 0.6,
     },
     viewAll: {
         color: '#A3C19B',
