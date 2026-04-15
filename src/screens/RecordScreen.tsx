@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker'
 import React, { useState } from 'react'
 import {
     Alert,
+    Image,
     Modal,
     Pressable,
     ScrollView,
@@ -11,10 +12,15 @@ import {
     Text,
     TextInput,
     View,
+    ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { StreamingAssistantMarkdown } from '../components/common/StreamingAssistantMarkdown'
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
+import { analyze, analyzeImage as apiAnalyzeImage } from '../api/ai'
+import { useAuth } from '../context/AuthContext'
+import type { UserNutritionContext } from '../api/types'
 
 // ─── Colors (consistent with HomeScreen) ────────────────────
 const COLORS = {
@@ -46,19 +52,7 @@ const EXAMPLE_DESCRIPTIONS = [
     'Dinner: One bowl of brown rice, steamed fish, stir-fried vegetables',
 ]
 
-const MOCK_CHAT_MESSAGES: ChatMessage[] = [
-    {
-        id: '1',
-        text: "Hi! I'm your FoodPrint assistant. How can I help with your meals today?",
-        sender: 'assistant',
-        timestamp: new Date(),
-    },
-]
-
 // ─── Handlers ────────────────────────────────────────────────
-const handleAnalyzeText = () => {
-    console.log('Analyze Text')
-}
 
 // ─── Chat Modal Component ──────────────────────────────────────────
 function ChatModal({
@@ -68,6 +62,7 @@ function ChatModal({
     inputText,
     onInputChange,
     onSendMessage,
+    sending = false,
 }: {
     visible: boolean
     onClose: () => void
@@ -75,6 +70,7 @@ function ChatModal({
     inputText: string
     onInputChange: (text: string) => void
     onSendMessage: () => void
+    sending?: boolean
 }) {
     return (
         <Modal
@@ -109,17 +105,36 @@ function ChatModal({
                                         message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
                                     ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.messageText,
-                                            message.sender === 'user' ? styles.userText : styles.assistantText,
-                                        ]}
-                                    >
-                                        {message.text}
-                                    </Text>
+                                    {message.sender === 'user' ? (
+                                        <Text style={[styles.messageText, styles.userText]}>
+                                            {message.text}
+                                        </Text>
+                                    ) : (
+                                        <StreamingAssistantMarkdown
+                                            markdown={message.text}
+                                            textColor={COLORS.dark}
+                                            linkColor={COLORS.primary}
+                                        />
+                                    )}
                                 </View>
                             </View>
                         ))}
+                        {sending ? (
+                            <View style={[styles.messageContainer, styles.assistantMessage]}>
+                                <View
+                                    style={[
+                                        styles.messageBubble,
+                                        styles.assistantBubble,
+                                        styles.thinkingBubble,
+                                    ]}
+                                >
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                    <Text style={[styles.messageText, styles.assistantText, styles.thinkingLabel]}>
+                                        Thinking...
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : null}
                     </ScrollView>
 
                     {/* Input Area */}
@@ -136,16 +151,20 @@ function ChatModal({
                         <Pressable
                             style={[
                                 styles.sendButton,
-                                !inputText.trim() && styles.sendButtonDisabled,
+                                (!inputText.trim() || sending) && styles.sendButtonDisabled,
                             ]}
                             onPress={onSendMessage}
-                            disabled={!inputText.trim()}
+                            disabled={!inputText.trim() || sending}
                         >
-                            <Ionicons
-                                name="send"
-                                size={18}
-                                color={inputText.trim() ? '#fff' : COLORS.sub}
-                            />
+                            {sending ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Ionicons
+                                    name="send"
+                                    size={18}
+                                    color={inputText.trim() && !sending ? '#fff' : COLORS.sub}
+                                />
+                            )}
                         </Pressable>
                     </View>
                 </View>
@@ -156,25 +175,44 @@ function ChatModal({
 
 // ─── Main Component ──────────────────────────────────────────
 export function RecordScreen() {
+    const { userProfile } = useAuth()
     const [activeMode, setActiveMode] = useState<RecordMode>('text')
     const [textInput, setTextInput] = useState('')
     
-    // Chat-related state - FloatingChatButton 同步接入
+    // Build userContext from profile for AI requests
+    const userContext: UserNutritionContext | undefined = userProfile
+        ? {
+              heightCm: userProfile.height,
+              weightKg: userProfile.weight,
+              age: userProfile.age,
+              gender: userProfile.gender,
+              goal: userProfile.goal,
+              dailyCalorieTarget: userProfile.dailyCalories,
+          }
+        : undefined
+    
+    // Analysis-related state
+    const [analyzing, setAnalyzing] = useState(false)
+    const [analysisResult, setAnalysisResult] = useState<any>(null)
+    const [analysisError, setAnalysisError] = useState<string | null>(null)
+    
+    // Chat-related state
     const [chatVisible, setChatVisible] = useState(false)
     const [chatInput, setChatInput] = useState('')
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+    const [sendingMessage, setSendingMessage] = useState(false)
     
-    // ─── Photo/Gallery Handlers - 接入手机能力 ─────────────────────
+    // ─── Photo/Gallery Handlers ─────────────────────
     const handleTakePhoto = async () => {
         try {
-            // 请求相机权限
+            // Request camera permission
             const { status } = await ImagePicker.requestCameraPermissionsAsync()
             if (status !== 'granted') {
                 Alert.alert('Permission denied', 'Camera permission is required to take photos')
                 return
             }
             
-            // 打开相机
+            // Launch camera
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
@@ -184,7 +222,7 @@ export function RecordScreen() {
             
             if (!result.canceled && result.assets?.[0]?.uri) {
                 console.log('Photo taken:', result.assets[0].uri)
-                Alert.alert('Photo taken', `Image URI: ${result.assets[0].uri}`)
+                await handleImageAnalysis(result.assets[0].uri)
             }
         } catch (error) {
             console.log('Take photo error:', error)
@@ -194,14 +232,14 @@ export function RecordScreen() {
     
     const handleUploadFromGallery = async () => {
         try {
-            // 请求媒体库权限
+            // Request media library permission
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
             if (status !== 'granted') {
                 Alert.alert('Permission denied', 'Media library permission is required to access photos')
                 return
             }
             
-            // 打开相册
+            // Open gallery
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
@@ -211,7 +249,7 @@ export function RecordScreen() {
             
             if (!result.canceled && result.assets?.[0]?.uri) {
                 console.log('Image selected:', result.assets[0].uri)
-                Alert.alert('Image selected', `Image URI: ${result.assets[0].uri}`)
+                await handleImageAnalysis(result.assets[0].uri)
             }
         } catch (error) {
             console.log('Upload from gallery error:', error)
@@ -219,7 +257,7 @@ export function RecordScreen() {
         }
     }
     
-    // ─── Chat Handlers - 复用HomeScreen聊天逻辑 ─────────────────────
+    // ─── Chat Handlers ─────────────────────
     const handleChatPress = () => {
         setChatVisible(true)
     }
@@ -228,28 +266,129 @@ export function RecordScreen() {
         setChatVisible(false)
     }
     
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         const messageText = chatInput.trim()
         if (!messageText) return
         
-        // Add user message
-        const userMessage: ChatMessage = {
+        // Add user message immediately
+        const userMsg: ChatMessage = {
             id: Date.now().toString(),
             text: messageText,
             sender: 'user',
             timestamp: new Date(),
         }
-        
-        // Add mock assistant response
-        const assistantMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            text: 'Thanks! AI response will be connected later.',
-            sender: 'assistant',
-            timestamp: new Date(),
-        }
-        
-        setChatMessages(prev => [...prev, userMessage, assistantMessage])
+        setChatMessages(prev => [...prev, userMsg])
         setChatInput('')
+        setSendingMessage(true)
+        
+        try {
+            const res = await analyze({ text: messageText, userContext })
+            const data = res.data
+            let reply: string
+
+            if (!data) {
+                reply = 'No response from AI'
+            } else if (data.type === 'PROFILE_NEEDED' && data.profilePrompt) {
+                reply = data.profilePrompt
+            } else if (data.adviceText) {
+                reply = data.adviceText
+            } else if (data.type === 'FOOD_ANALYSIS' && data.foodAnalysis) {
+                const s = data.foodAnalysis.summary
+                const foods = data.foodAnalysis.foods?.map(f => f.nameEn || f.nameZh).join(', ') || ''
+                reply = `Detected: ${foods}\nCalories: ${s?.totalCalories ?? '-'} kcal | Protein: ${s?.totalProteinG ?? '-'}g | Fat: ${s?.totalFatG ?? '-'}g | Carbs: ${s?.totalCarbsG ?? '-'}g`
+            } else {
+                reply = res.message || 'No response from AI'
+            }
+            const assistantMsg: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                text: reply,
+                sender: 'assistant',
+                timestamp: new Date(),
+            }
+            setChatMessages(prev => [...prev, assistantMsg])
+        } catch (error: any) {
+            const errMsg: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                text: `Error: ${error?.message || 'Unknown error'}`,
+
+                sender: 'assistant',
+                timestamp: new Date(),
+            }
+            setChatMessages(prev => [...prev, errMsg])
+        } finally {
+            setSendingMessage(false)
+        }
+    }
+
+    // ─── Text Analysis Handler ─────────────────────────
+    const handleAnalyzeText = async () => {
+        if (!textInput.trim()) {
+            Alert.alert('Notice', 'Please enter a food description')
+            return
+        }
+        setAnalyzing(true)
+        setAnalysisError(null)
+        try {
+            const res = await analyze({ text: textInput, userContext })
+            const data = res.data
+            let displayMessage: string
+            if (data?.type === 'PROFILE_NEEDED' && data.profilePrompt) {
+                displayMessage = data.profilePrompt
+            } else if (data?.adviceText) {
+                displayMessage = data.adviceText
+            } else if (data?.type === 'FOOD_ANALYSIS' && data.foodAnalysis?.summary) {
+                displayMessage = `Total calories: ${data.foodAnalysis.summary.totalCalories ?? '-'} kcal`
+            } else {
+                displayMessage = res.message || 'Analysis complete'
+            }
+            setAnalysisResult({
+                type: data?.type,
+                content: data,
+                message: displayMessage,
+                inputText: textInput,
+            })
+        } catch (error: any) {
+            const errorMsg = error?.message || 'Network error'
+            setAnalysisError(errorMsg)
+            Alert.alert('Request Failed', errorMsg)
+        } finally {
+            setAnalyzing(false)
+        }
+    }
+
+    // ─── Image Analysis Handler ─────────────────────────
+    const handleImageAnalysis = async (imageUri: string) => {
+        setAnalyzing(true)
+        setAnalysisError(null)
+        try {
+            // Convert local URI to Blob
+            const resp = await fetch(imageUri)
+            const blob = await resp.blob()
+            const res = await apiAnalyzeImage(blob, 'photo.jpg')
+            const data = res.data
+            let displayMessage: string
+            if (data?.type === 'PROFILE_NEEDED' && data.profilePrompt) {
+                displayMessage = data.profilePrompt
+            } else if (data?.adviceText) {
+                displayMessage = data.adviceText
+            } else if (data?.type === 'FOOD_ANALYSIS' && data.foodAnalysis?.summary) {
+                displayMessage = `Total calories: ${data.foodAnalysis.summary.totalCalories ?? '-'} kcal`
+            } else {
+                displayMessage = res.message || 'Image recognition complete'
+            }
+            setAnalysisResult({
+                type: data?.type,
+                content: data,
+                message: displayMessage,
+                imageUri,
+            })
+        } catch (error: any) {
+            const errorMsg = error?.message || 'Image processing failed'
+            setAnalysisError(errorMsg)
+            Alert.alert('Request Failed', errorMsg)
+        } finally {
+            setAnalyzing(false)
+        }
     }
 
     // ─── Segmented Control Renderer ─────────────────────────
@@ -305,6 +444,134 @@ export function RecordScreen() {
         </View>
     )
 
+    // ─── Analysis Result Card ─────────────────────────────
+    const renderAnalysisResult = () => {
+        if (analyzing) {
+            return (
+                <View style={styles.resultCard}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text style={[styles.resultMessage, { marginTop: 12 }]}>Analyzing...</Text>
+                </View>
+            )
+        }
+
+        if (analysisError) {
+            return (
+                <View style={styles.resultCard}>
+                    <View style={styles.resultHeader}>
+                        <Ionicons name="alert-circle" size={20} color="#E74C3C" />
+                        <Text style={[styles.resultTitle, { color: '#E74C3C' }]}>Analysis Failed</Text>
+                    </View>
+                    <Text style={styles.resultMessage}>{analysisError}</Text>
+                    <Pressable style={styles.retryButton} onPress={() => { setAnalysisError(null); setAnalysisResult(null) }}>
+                        <Text style={styles.retryButtonText}>Dismiss</Text>
+                    </Pressable>
+                </View>
+            )
+        }
+
+        if (!analysisResult) return null
+
+        const data = analysisResult.content
+        const isFood = data?.type === 'FOOD_ANALYSIS' && data?.foodAnalysis
+        const isProfileNeeded = data?.type === 'PROFILE_NEEDED'
+
+        return (
+            <View style={styles.resultCard}>
+                {/* Header */}
+                <View style={styles.resultHeader}>
+                    <Ionicons
+                        name={isProfileNeeded ? 'person-circle' : 'checkmark-circle'}
+                        size={20}
+                        color={isProfileNeeded ? '#F39C12' : COLORS.primary}
+                    />
+                    <Text style={styles.resultTitle}>
+                        {isProfileNeeded ? 'Profile Incomplete' : 'Analysis Result'}
+                    </Text>
+                </View>
+
+                {/* Photo preview */}
+                {analysisResult.imageUri && (
+                    <Image
+                        source={{ uri: analysisResult.imageUri }}
+                        style={styles.resultImage}
+                        resizeMode="cover"
+                    />
+                )}
+
+                {/* Profile needed */}
+                {isProfileNeeded && (
+                    <Text style={styles.resultMessage}>{data.profilePrompt}</Text>
+                )}
+
+                {/* Advice / Chat text */}
+                {!isFood && !isProfileNeeded && data?.adviceText && (
+                    <Text style={styles.resultMessage}>{data.adviceText}</Text>
+                )}
+
+                {/* Food analysis details */}
+                {isFood && (
+                    <>
+                        {/* Meal summary bar */}
+                        <View style={styles.summaryRow}>
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryValue}>{Math.round(data.foodAnalysis.summary?.totalCalories ?? 0)}</Text>
+                                <Text style={styles.summaryLabel}>kcal</Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryValue}>{Math.round(data.foodAnalysis.summary?.totalProteinG ?? 0)}g</Text>
+                                <Text style={styles.summaryLabel}>Protein</Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryValue}>{Math.round(data.foodAnalysis.summary?.totalFatG ?? 0)}g</Text>
+                                <Text style={styles.summaryLabel}>Fat</Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                                <Text style={styles.summaryValue}>{Math.round(data.foodAnalysis.summary?.totalCarbsG ?? 0)}g</Text>
+                                <Text style={styles.summaryLabel}>Carbs</Text>
+                            </View>
+                        </View>
+
+                        {/* Food items list */}
+                        {data.foodAnalysis.foods?.map((food: any, idx: number) => (
+                            <View key={idx} style={styles.foodItem}>
+                                <View style={styles.foodNameRow}>
+                                    <Text style={styles.foodName}>
+                                        {food.nameEn || food.nameZh}
+                                    </Text>
+                                    <Text style={styles.foodCalories}>{Math.round(food.calories ?? 0)} kcal</Text>
+                                </View>
+                                <Text style={styles.foodPortion}>
+                                    {food.portionAmount}{food.portionUnit}
+                                    {food.dataSource ? ` · ${food.dataSource}` : ''}
+                                </Text>
+                                <View style={styles.foodMacros}>
+                                    <Text style={styles.macroText}>P {Math.round(food.proteinG ?? 0)}g</Text>
+                                    <Text style={styles.macroText}>F {Math.round(food.fatG ?? 0)}g</Text>
+                                    <Text style={styles.macroText}>C {Math.round(food.carbsG ?? 0)}g</Text>
+                                </View>
+                                {food.flagged && (
+                                    <View style={styles.flagRow}>
+                                        <Ionicons name="warning" size={14} color="#F39C12" />
+                                        <Text style={styles.flagText}>{food.flagReason}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ))}
+                    </>
+                )}
+
+                {/* Dismiss button */}
+                <Pressable style={styles.retryButton} onPress={() => { setAnalysisResult(null); setAnalysisError(null) }}>
+                    <Text style={styles.retryButtonText}>Done</Text>
+                </Pressable>
+            </View>
+        )
+    }
+
     // ─── Text Mode Content ───────────────────────────────────
     const renderTextMode = () => (
         <>
@@ -339,13 +606,24 @@ export function RecordScreen() {
                     style={({ pressed }) => [
                         styles.analyzeButton,
                         pressed && styles.analyzeButtonPressed,
+                        analyzing && styles.analyzeButtonDisabled,
                     ]}
                     onPress={handleAnalyzeText}
+                    disabled={analyzing || !textInput.trim()}
                 >
-                    <Ionicons name="send" size={18} color="#fff" />
-                    <Text style={styles.analyzeButtonText}>Analyze Now</Text>
+                    {analyzing ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Ionicons name="send" size={18} color="#fff" />
+                    )}
+                    <Text style={styles.analyzeButtonText}>
+                        {analyzing ? 'Analyzing...' : 'Analyze Now'}
+                    </Text>
                 </Pressable>
             </View>
+
+            {/* Analysis Result */}
+            {activeMode === 'text' && renderAnalysisResult()}
 
             {/* Example Descriptions */}
             <Text style={styles.exampleTitle}>Example descriptions:</Text>
@@ -405,6 +683,9 @@ export function RecordScreen() {
                 </View>
             </View>
 
+            {/* Photo Analysis Result */}
+            {activeMode === 'photo' && renderAnalysisResult()}
+
             {/* Recording Tips Card */}
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -448,7 +729,7 @@ export function RecordScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header with white background - 修复安卓模拟器遮挡问题 */}
+                {/* Header with white background */}
                 <View style={styles.headerContainer}>
                     <Text style={styles.header}>FoodPrint</Text>
                 </View>
@@ -467,10 +748,10 @@ export function RecordScreen() {
                 <View style={{ height: 80 }} />
             </ScrollView>
 
-            {/* FloatingChatButton 同步接入 - 与HomeScreen保持统一 */}
+            {/* Floating Chat Button */}
             <FloatingChatButton onPress={handleChatPress} />
             
-            {/* Chat Modal - 复用HomeScreen的聊天弹窗逻辑 */}
+            {/* Chat Modal */}
             <ChatModal
                 visible={chatVisible}
                 onClose={handleCloseChat}
@@ -478,6 +759,7 @@ export function RecordScreen() {
                 inputText={chatInput}
                 onInputChange={setChatInput}
                 onSendMessage={handleSendMessage}
+                sending={sendingMessage}
             />
         </SafeAreaView>
     )
@@ -498,7 +780,7 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
 
-    // ── Header - 修复顶部被遮挡问题 ──
+    // ── Header ──
     headerContainer: {
         backgroundColor: COLORS.card,
         paddingHorizontal: 16,
@@ -605,6 +887,10 @@ const styles = StyleSheet.create({
     },
     analyzeButtonPressed: {
         backgroundColor: COLORS.primaryDark,
+    },
+    analyzeButtonDisabled: {
+        backgroundColor: COLORS.sub,
+        opacity: 0.6,
     },
     analyzeButtonText: {
         color: '#fff',
@@ -757,6 +1043,16 @@ const styles = StyleSheet.create({
     assistantText: {
         color: COLORS.dark,
     },
+    thinkingBubble: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        minWidth: 120,
+    },
+    thinkingLabel: {
+        fontSize: 14,
+        opacity: 0.85,
+    },
     chatInputArea: {
         alignItems: 'flex-end',
         borderTopColor: '#F0F0F0',
@@ -786,5 +1082,131 @@ const styles = StyleSheet.create({
     },
     sendButtonDisabled: {
         backgroundColor: '#E0E0E0',
+    },
+
+    // ── Analysis Result Card ──
+    resultCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: 20,
+        elevation: 2,
+        marginBottom: 20,
+        padding: 24,
+        shadowColor: COLORS.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+    },
+    resultHeader: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    resultTitle: {
+        color: COLORS.dark,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    resultMessage: {
+        color: COLORS.sub,
+        fontSize: 14,
+        lineHeight: 22,
+        marginBottom: 12,
+    },
+    resultImage: {
+        borderRadius: 12,
+        height: 180,
+        marginBottom: 16,
+        width: '100%',
+    },
+    retryButton: {
+        alignItems: 'center',
+        backgroundColor: COLORS.lightGray,
+        borderRadius: 12,
+        marginTop: 8,
+        paddingVertical: 12,
+    },
+    retryButtonText: {
+        color: COLORS.dark,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    // ── Meal Summary Row ──
+    summaryRow: {
+        backgroundColor: COLORS.iconBg,
+        borderRadius: 14,
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 16,
+        paddingVertical: 14,
+    },
+    summaryItem: {
+        alignItems: 'center',
+    },
+    summaryValue: {
+        color: COLORS.dark,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    summaryLabel: {
+        color: COLORS.sub,
+        fontSize: 11,
+        fontWeight: '500',
+        marginTop: 2,
+    },
+    summaryDivider: {
+        backgroundColor: COLORS.primary,
+        opacity: 0.3,
+        width: 1,
+    },
+
+    // ── Food Item ──
+    foodItem: {
+        borderBottomColor: '#F0F0F0',
+        borderBottomWidth: 1,
+        marginBottom: 12,
+        paddingBottom: 12,
+    },
+    foodNameRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    foodName: {
+        color: COLORS.dark,
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    foodCalories: {
+        color: COLORS.primary,
+        fontSize: 15,
+        fontWeight: '700',
+        marginLeft: 8,
+    },
+    foodPortion: {
+        color: COLORS.sub,
+        fontSize: 12,
+        marginBottom: 6,
+    },
+    foodMacros: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    macroText: {
+        color: COLORS.sub,
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    flagRow: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 4,
+        marginTop: 6,
+    },
+    flagText: {
+        color: '#F39C12',
+        fontSize: 12,
     },
 })
