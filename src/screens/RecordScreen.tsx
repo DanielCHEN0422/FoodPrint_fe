@@ -578,8 +578,8 @@ export function RecordScreen() {
             {/* AI Smart Analysis Card */}
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                    <MaterialCommunityIcons
-                        name="auto-fix"
+                    <Ionicons
+                        name="sparkles"
                         size={20}
                         color={COLORS.primary}
                         style={styles.cardIcon}
@@ -642,8 +642,8 @@ export function RecordScreen() {
             {/* Photo Recognition Card */}
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                    <MaterialCommunityIcons
-                        name="auto-fix"
+                    <Ionicons
+                        name="sparkles"
                         size={20}
                         color={COLORS.primary}
                         style={styles.cardIcon}

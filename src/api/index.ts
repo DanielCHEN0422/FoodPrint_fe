@@ -14,4 +14,5 @@ export {
 export * from './user'
 export * from './food'
 export * from './ai'
+export * from './community'
 export * from './types'

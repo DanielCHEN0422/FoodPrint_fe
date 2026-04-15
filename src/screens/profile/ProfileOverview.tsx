@@ -98,11 +98,11 @@ export function ProfileOverview({
                     </View>
 
                     <View style={styles.statsGrid}>
-                        {[
+                        {([
                             { icon: 'trophy-outline', label: 'Achievements', value: '24' },
                             { icon: 'target', label: 'Goals Met', value: '18/30' },
                             { icon: 'calendar-month-outline', label: 'Days Active', value: '45' },
-                        ].map((item) => (
+                        ] as const).map((item) => (
                             <View key={item.label} style={styles.statItem}>
                                 <View
                                     style={[
