@@ -10,7 +10,7 @@ import { HomeScreen } from '../screens/HomeScreen'
 import { LoginScreen } from '../screens/LoginScreen'
 import { OnboardingScreen } from '../screens/OnboardingScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
-import { RecordScreen } from '../screens/RecordScreen'
+import { AIChatScreen } from '../screens/AIChatScreen'
 import { RegisterScreen } from '../screens/RegisterScreen'
 import type { AuthStackParamList, RootTabParamList } from './types'
 
@@ -24,6 +24,7 @@ function MainTabs() {
     return (
         <Tab.Navigator
             screenOptions={{
+                headerShown: true,
                 headerTitleAlign: 'center',
                 headerStyle: { backgroundColor: colors.background },
                 headerTintColor: colors.onSurface,
@@ -41,7 +42,7 @@ function MainTabs() {
                 name="Home"
                 component={HomeScreen}
                 options={{
-                    headerShown: false,
+                    title: 'Home',
                     tabBarLabel: 'Home',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
@@ -53,14 +54,14 @@ function MainTabs() {
                 }}
             />
             <Tab.Screen
-                name="Record"
-                component={RecordScreen}
+                name="AIChat"
+                component={AIChatScreen}
                 options={{
-                    headerShown: false,
-                    tabBarLabel: 'Record',
+                    title: 'AI Chat',
+                    tabBarLabel: 'AI Chat',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
-                            name="camera-plus"
+                            name="chat-processing-outline"
                             size={size ?? 24}
                             color={color}
                         />
@@ -71,6 +72,7 @@ function MainTabs() {
                 name="Community"
                 component={CommunityScreen}
                 options={{
+                    title: 'Community',
                     tabBarLabel: 'Community',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
@@ -85,6 +87,7 @@ function MainTabs() {
                 name="Profile"
                 component={ProfileScreen}
                 options={{
+                    title: 'Profile',
                     tabBarLabel: 'Profile',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons

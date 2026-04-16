@@ -8,9 +8,9 @@ import {
     Image,
     Modal,
     TextInput,
-    SafeAreaView,
 } from 'react-native'
 import React, { useState } from 'react'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 // Import from modularized structure
 import { useCommunityState, useCommunityStyles } from './hooks'
@@ -106,12 +106,15 @@ export function CommunityScreen() {
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: communityStyles.container.backgroundColor }}>
-            <ScrollView style={communityStyles.container} showsVerticalScrollIndicator={false}>
-            <View style={communityStyles.header}>
-                <Text style={communityStyles.title}>FoodPrint</Text>
-            </View>
-
+        <SafeAreaView
+            style={{ flex: 1, backgroundColor: communityStyles.container.backgroundColor }}
+            edges={['left', 'right']}
+        >
+            <ScrollView
+                style={communityStyles.container}
+                contentContainerStyle={{ paddingTop: 16 }}
+                showsVerticalScrollIndicator={false}
+            >
             {/* Community Challenges Section */}
             <View style={communityStyles.section}>
                 <View style={communityStyles.sectionHeader}>

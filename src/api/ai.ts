@@ -2,8 +2,10 @@ import { getSupabaseAccessToken } from '../lib/supabase'
 import { ApiError, apiPost, getEffectiveBaseUrl } from './client'
 import type {
     AIResponseDto,
+    AiLogSaveRequest,
     AnalyzeRequest,
     ApiResponse,
+    FoodLogDto,
 } from './types'
 
 const BASE = 'api/ai'
@@ -16,15 +18,61 @@ export async function analyze(
 }
 
 /**
+ * POST /api/ai/log — 一键保存 AI 分析（含用户在表单中修改后的 analysisResult）
+ * Header: userId（与 api/food-logs 一致，后端常据此解析归属用户）
+ */
+export async function saveAiAnalysisLog(
+    body: AiLogSaveRequest,
+    userId: string
+): Promise<ApiResponse<FoodLogDto | null>> {
+    return apiPost<FoodLogDto | null>(`${BASE}/log`, body, {
+        headers: { userId },
+    })
+}
+
+/** Web / 已有 Blob 时使用；React Native 相册/相机请用带 `uri` 的对象 */
+export type AnalyzeImageNativeFile = {
+    uri: string
+    name?: string
+    type?: string
+}
+
+export type AnalyzeImageInput = Blob | AnalyzeImageNativeFile
+
+function isNativePickerFile(x: AnalyzeImageInput): x is AnalyzeImageNativeFile {
+    return (
+        typeof x === 'object' &&
+        x !== null &&
+        'uri' in x &&
+        typeof (x as AnalyzeImageNativeFile).uri === 'string'
+    )
+}
+
+/**
  * POST /api/ai/analyze/image - 图片上传分析（multipart/form-data）
- * React Native 下 FormData 支持 Blob；若用 base64 需先转 Blob 或由后端支持 base64 端点
+ * - Web: 传 `Blob`
+ * - React Native: 传 `{ uri, type?, name? }`，勿用 `fetch(fileUri).blob()`（Android 上常失败）
  */
 export async function analyzeImage(
-    imageBlob: Blob,
+    image: AnalyzeImageInput,
     filename = 'image.jpg'
 ): Promise<ApiResponse<AIResponseDto>> {
     const formData = new FormData()
-    formData.append('image', imageBlob, filename)
+    if (typeof Blob !== 'undefined' && image instanceof Blob) {
+        formData.append('image', image, filename)
+    } else if (isNativePickerFile(image)) {
+        const name = image.name ?? filename
+        const type = image.type ?? 'image/jpeg'
+        formData.append('image', {
+            uri: image.uri,
+            name,
+            type,
+        } as unknown as Blob)
+    } else {
+        throw new TypeError(
+            'analyzeImage: expected Blob or { uri, name?, type? }'
+        )
+    }
 
     const token = await getSupabaseAccessToken()
     const url = `${getEffectiveBaseUrl()}/${BASE}/analyze/image`

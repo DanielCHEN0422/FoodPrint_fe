@@ -1,12 +1,12 @@
 // src/services/chatUtils.ts
-import { AIResponse, extractAssistantText } from './ai';
+import { AIResponse, extractAssistantText } from './ai'
 
 // 使用现有的 ChatMessage 接口
 export interface ChatMessage {
-    id: string;
-    text: string;
-    sender: 'user' | 'assistant';
-    timestamp: Date;
+    id: string
+    text: string
+    sender: 'user' | 'assistant'
+    timestamp: Date
 }
 
 /**
@@ -18,7 +18,7 @@ export function createUserMessage(text: string): ChatMessage {
         text: text.trim(),
         sender: 'user',
         timestamp: new Date(),
-    };
+    }
 }
 
 /**
@@ -30,23 +30,25 @@ export function createAssistantMessage(text: string): ChatMessage {
         text,
         sender: 'assistant',
         timestamp: new Date(),
-    };
+    }
 }
 
 /**
  * 从API响应创建助手消息
  */
-export function createAssistantMessageFromAPI(response: AIResponse): ChatMessage {
-    const text = response.success 
+export function createAssistantMessageFromAPI(
+    response: AIResponse
+): ChatMessage {
+    const text = response.success
         ? extractAssistantText(response)
-        : `抱歉，处理出错了：${response.error || '未知错误'}`;
+        : `Sorry, something went wrong: ${response.error || 'Unknown error'}`
 
-    return createAssistantMessage(text);
+    return createAssistantMessage(text)
 }
 
 /**
  * 创建错误消息
  */
 export function createErrorMessage(error: string): ChatMessage {
-    return createAssistantMessage(`网络错误：${error}`);
+    return createAssistantMessage(`Network error: ${error}`)
 }
