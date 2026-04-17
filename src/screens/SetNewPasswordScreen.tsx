@@ -1,4 +1,4 @@
-import type { StackScreenProps } from '@react-navigation/stack'
+import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useState } from 'react'
@@ -9,19 +9,10 @@ import {
     ScrollView,
     View,
 } from 'react-native'
-import {
-    Button,
-    HelperText,
-    Text,
-    TextInput,
-    useTheme,
-} from 'react-native-paper'
+import { Button, Text, TextInput, useTheme } from 'react-native-paper'
 
-import {
-    evaluatePasswordStrength,
-    isValidEmail,
-    useAuth,
-} from '../context/AuthContext'
+import { evaluatePasswordStrength } from '../context/AuthContext'
+import { updatePasswordAfterRecovery } from '../lib/passwordRecovery'
 import type { AuthStackParamList } from '../navigation/types'
 import {
     AUTH_PRIMARY_BUTTON,
@@ -29,40 +20,36 @@ import {
     useAuthScreenTheme,
 } from './auth/authScreenShared'
 
-type Props = StackScreenProps<AuthStackParamList, 'Register'>
+type Props = NativeStackScreenProps<AuthStackParamList, 'SetNewPassword'>
 
-export function RegisterScreen({ navigation }: Props) {
+export function SetNewPasswordScreen({ navigation, route }: Props) {
     const theme = useTheme()
     const themed = useAuthScreenTheme(theme)
-    const { register } = useAuth()
-    const [email, setEmail] = useState('')
+    const { email } = route.params
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
-    const emailTouched = email.length > 0
-    const emailValid = isValidEmail(email)
     const passwordStrength = evaluatePasswordStrength(password)
 
-    const onRegister = async () => {
+    const mapAuthMessage = (message: string) =>
+        /network|fetch|failed|connection/i.test(message)
+            ? 'Network error. Check your connection and try again.'
+            : message
+
+    const onSubmit = async () => {
         Keyboard.dismiss()
         setError('')
 
-        if (!email.trim()) {
-            setError('Please enter your email')
-            return
-        }
-        if (!isValidEmail(email)) {
-            setError('Please enter a valid email address')
-            return
-        }
         if (password.length < 8) {
-            setError('Password must be at least 8 characters with upper, lower, number and special character')
+            setError('Password must be at least 8 characters')
             return
         }
         if (!passwordStrength.isStrong) {
-            setError('Please meet all password requirements (8+ chars, upper, lower, number, special character)')
+            setError(
+                'Please meet all password requirements (8+ chars, upper, lower, number, special)'
+            )
             return
         }
         if (password !== confirmPassword) {
@@ -71,17 +58,17 @@ export function RegisterScreen({ navigation }: Props) {
         }
 
         setSubmitting(true)
-        const result = await register(email, password)
+        const { error: updateError } = await updatePasswordAfterRecovery(password)
         setSubmitting(false)
 
-        if (!result.success) {
-            setError(result.message ?? 'Registration failed')
+        if (updateError) {
+            setError(
+                mapAuthMessage(updateError.message || 'Failed to update password')
+            )
             return
         }
-        if (result.message && result.message.includes('verify your email')) {
-            setError(result.message)
-            return
-        }
+
+        navigation.navigate('Login')
     }
 
     return (
@@ -106,19 +93,20 @@ export function RegisterScreen({ navigation }: Props) {
                     <View style={authSharedStyles.statRow}>
                         <MaterialCommunityIcons
                             color={themed.statText.color}
-                            name="shield-check-outline"
+                            name="lock-reset"
                             size={20}
                         />
                         <Text style={[authSharedStyles.statText, themed.statText]}>
-                            Start your healthy eating journey
+                            Choose a strong new password
                         </Text>
                     </View>
                 </View>
 
                 <View style={[authSharedStyles.formCard, themed.formCard]}>
-                    <Text style={authSharedStyles.formTitle}>Create Account</Text>
+                    <Text style={authSharedStyles.formTitle}>New password</Text>
                     <Text style={authSharedStyles.subTitle}>
-                        Save your diet records and get personalized suggestions
+                        This email is resetting its password. Enter and confirm your new
+                        password below.
                     </Text>
 
                     {error ? (
@@ -141,26 +129,17 @@ export function RegisterScreen({ navigation }: Props) {
 
                     <TextInput
                         autoCapitalize="none"
-                        autoComplete="email"
-                        keyboardType="email-address"
+                        disabled
                         label="Email"
                         left={<TextInput.Icon icon="email-outline" />}
                         mode="outlined"
-                        onChangeText={setEmail}
                         style={authSharedStyles.input}
-                        textContentType="emailAddress"
                         value={email}
                     />
-                    <HelperText
-                        type="error"
-                        visible={emailTouched && !emailValid}
-                    >
-                        <Text>Please enter a valid email (e.g. name@example.com)</Text>
-                    </HelperText>
 
                     <TextInput
                         autoComplete="password-new"
-                        label="Password"
+                        label="New password"
                         left={<TextInput.Icon icon="lock-outline" />}
                         mode="outlined"
                         onChangeText={setPassword}
@@ -227,11 +206,10 @@ export function RegisterScreen({ navigation }: Props) {
 
                     <TextInput
                         autoComplete="password-new"
-                        label="Confirm Password"
+                        label="Confirm new password"
                         left={<TextInput.Icon icon="lock-check-outline" />}
                         mode="outlined"
                         onChangeText={setConfirmPassword}
-                        passwordRules="required: lower; required: upper; required: digit; required: special; minlength: 8;"
                         secureTextEntry
                         style={authSharedStyles.input}
                         textContentType="newPassword"
@@ -243,27 +221,26 @@ export function RegisterScreen({ navigation }: Props) {
                         disabled={submitting}
                         loading={submitting}
                         mode="contained"
-                        onPress={() => void onRegister()}
+                        onPress={() => void onSubmit()}
                         style={authSharedStyles.primaryButton}
                     >
-                        <Text>{submitting ? 'Signing Up...' : 'Sign Up'}</Text>
+                        <Text>{submitting ? 'Saving…' : 'Save password'}</Text>
                     </Button>
 
                     <View style={authSharedStyles.linkRow}>
-                        <Text>Already have an account?</Text>
                         <Button
                             compact
                             mode="text"
                             onPress={() => navigation.navigate('Login')}
                         >
-                            <Text>Sign In</Text>
+                            <Text>Back to Sign In</Text>
                         </Button>
                     </View>
                 </View>
 
                 <View style={authSharedStyles.footer}>
                     <Text style={authSharedStyles.footerText}>
-                        By creating an account, you agree to our Terms of Service and Privacy Policy
+                        By continuing, you agree to our Terms of Service and Privacy Policy
                     </Text>
                 </View>
             </ScrollView>

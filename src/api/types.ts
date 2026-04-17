@@ -207,3 +207,45 @@ export interface AIResponseDto {
     profileIncomplete?: boolean
     profilePrompt?: string
 }
+
+// ---------- Community 模块 ----------
+export interface CommentResponse {
+    id: number
+    postId: number
+    userId: string
+    authorNickname?: string | null
+    authorAvatarUrl?: string | null
+    content: string
+    createdAt: string
+    updatedAt?: string
+}
+
+export interface PostResponse {
+    id: number
+    userId: string
+    authorNickname?: string | null
+    authorAvatarUrl?: string | null
+    title: string
+    content: string
+    imageUrl?: string | null
+    likeCount: number
+    createdAt: string
+    updatedAt?: string
+    comments?: CommentResponse[]
+    likedByCurrentUser: boolean
+}
+
+export interface CreatePostRequest {
+    title: string
+    content: string
+    imageUrl?: string | null
+}
+
+export interface CreateCommentRequest {
+    content: string
+}
+
+export interface ImpactMetricsResponse {
+    totalUsers: number
+    totalWeightLost: number
+}

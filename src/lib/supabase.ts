@@ -61,5 +61,18 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
     const {
         data: { session },
     } = await supabase.auth.getSession()
-    return session?.access_token ?? null
+
+    if (session?.access_token) {
+        return session.access_token
+    }
+
+    const { error } = await supabase.auth.refreshSession()
+    if (error) {
+        return null
+    }
+
+    const {
+        data: { session: refreshedSession },
+    } = await supabase.auth.getSession()
+    return refreshedSession?.access_token ?? null
 }

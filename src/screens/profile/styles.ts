@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native'
-import type { Theme } from 'react-native-paper'
+import type { MD3Theme as Theme } from 'react-native-paper'
 
 export function getProfilePalette(theme: Theme) {
     return {

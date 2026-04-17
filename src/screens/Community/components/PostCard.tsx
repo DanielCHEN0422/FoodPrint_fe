@@ -5,9 +5,18 @@ import { Post } from '../types'
 interface PostCardProps {
     post: Post
     onLikePress: (postId: string) => void
+    onCommentPress: (postId: string) => void
+    onFollowPress?: (authorId: string) => void
+    isFollowed?: boolean
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, onLikePress }) => {
+export const PostCard: React.FC<PostCardProps> = ({
+    post,
+    onLikePress,
+    onCommentPress,
+    onFollowPress,
+    isFollowed = false,
+}) => {
     return (
         <View style={styles.card}>
             <View style={styles.header}>
@@ -16,6 +25,21 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLikePress }) => {
                     <Text style={styles.name}>{post.authorName}</Text>
                     <Text style={styles.timestamp}>{post.timestamp}</Text>
                 </View>
+                {onFollowPress && (
+                    <TouchableOpacity
+                        style={[styles.followButton, isFollowed && styles.followButtonFollowed]}
+                        onPress={() => onFollowPress(post.authorId)}
+                    >
+                        <Text
+                            style={[
+                                styles.followButtonText,
+                                isFollowed && styles.followButtonTextFollowed,
+                            ]}
+                        >
+                            {isFollowed ? 'Following' : '+ Follow'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <Text style={styles.text}>{post.text}</Text>
@@ -28,10 +52,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLikePress }) => {
                         <Text style={styles.heartIcon}>{post.userLiked ? '❤️' : '🤍'}</Text>
                         <Text style={styles.statNumber}>{post.likes}</Text>
                     </TouchableOpacity>
-                    <View style={styles.statItem}>
+                    <TouchableOpacity style={styles.statItem} onPress={() => onCommentPress(post.id)}>
                         <Text style={styles.commentIcon}>💬</Text>
                         <Text style={styles.statNumber}>{post.comments}</Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>
@@ -106,5 +130,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         fontWeight: '500',
+    },
+    followButton: {
+        backgroundColor: '#8BA888',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        marginLeft: 8,
+    },
+    followButtonFollowed: {
+        backgroundColor: '#E8F0E7',
+    },
+    followButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#FFF',
+    },
+    followButtonTextFollowed: {
+        color: '#6D8A6B',
     },
 })

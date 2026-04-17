@@ -8,4 +8,6 @@ export type RootTabParamList = {
 export type AuthStackParamList = {
     Login: undefined
     Register: undefined
+    ForgotPassword: undefined
+    SetNewPassword: { email: string }
 }

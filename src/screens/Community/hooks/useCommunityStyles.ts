@@ -35,7 +35,8 @@ export function useCommunityStyles() {
     buttonGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginLeft: 0,
+        justifyContent: 'flex-end',
+        marginLeft: 'auto',
     },
     addButton: {
         width: 40,
@@ -52,8 +53,11 @@ export function useCommunityStyles() {
     },
     addButtonText: {
         fontSize: 24,
+        lineHeight: 24,
         color: colors.onPrimary,
         fontWeight: 'bold',
+        textAlign: 'center',
+        includeFontPadding: false,
     },
     scrollButton: {
         width: 40,
@@ -73,8 +77,11 @@ export function useCommunityStyles() {
     },
     scrollButtonText: {
         fontSize: 20,
+        lineHeight: 20,
         color: colors.onSurfaceVariant,
         fontWeight: '600',
+        textAlign: 'center',
+        includeFontPadding: false,
     },
     challengeListContent: {
         paddingHorizontal: 8,
@@ -390,7 +397,7 @@ export function useCommunityStyles() {
         marginBottom: 8,
     },
     requiredMark: {
-        color: colors.destructive,
+        color: colors.error,
     },
     textInputField: {
         borderWidth: 1,
@@ -414,7 +421,7 @@ export function useCommunityStyles() {
     },
     errorText: {
         fontSize: 13,
-        color: colors.destructive,
+        color: colors.error,
     },
     charCountChallenge: {
         fontSize: 13,
@@ -490,7 +497,7 @@ export function useCommunityStyles() {
     },
     previewContainer: {
         marginBottom: 24,
-        backgroundColor: colors.muted,
+        backgroundColor: colors.surfaceVariant,
         borderRadius: 14,
         padding: 14,
     },
@@ -633,7 +640,7 @@ export function useCommunityStyles() {
     },
     mealOption: {
         width: 160,
-        backgroundColor: colors.muted,
+        backgroundColor: colors.surfaceVariant,
         borderRadius: 12,
         paddingVertical: 16,
         paddingHorizontal: 8,

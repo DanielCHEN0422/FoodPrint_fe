@@ -29,8 +29,17 @@ export interface CommunityChallenge {
     streak?: number
 }
 
+export interface Comment {
+    id: string
+    authorName: string
+    authorImage: string
+    text: string
+    timestamp: string
+}
+
 export interface Post {
     id: string
+    authorId: string
     authorName: string
     authorImage: string
     timestamp: string
@@ -39,6 +48,7 @@ export interface Post {
     likes: number
     comments: number
     userLiked?: boolean
+    commentList?: Comment[]
 }
 
 export interface CreateChallengeFormData {

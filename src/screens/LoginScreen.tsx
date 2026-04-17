@@ -1,25 +1,23 @@
 import type { StackScreenProps } from '@react-navigation/stack'
 import { StatusBar } from 'expo-status-bar'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-    Alert,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    StyleSheet,
     View,
 } from 'react-native'
-import {
-    Button,
-    Text,
-    TextInput,
-    useTheme,
-} from 'react-native-paper'
+import { Button, Text, TextInput, useTheme } from 'react-native-paper'
 
 import { isValidEmail, useAuth } from '../context/AuthContext'
 import type { AuthStackParamList } from '../navigation/types'
+import {
+    AUTH_PRIMARY_BUTTON,
+    authSharedStyles,
+    useAuthScreenTheme,
+} from './auth/authScreenShared'
 
 type Props = StackScreenProps<AuthStackParamList, 'Login'>
 
@@ -40,6 +38,7 @@ const INSIGHTS = [
 
 export function LoginScreen({ navigation }: Props) {
     const theme = useTheme()
+    const themed = useAuthScreenTheme(theme)
     const { login } = useAuth()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -48,21 +47,6 @@ export function LoginScreen({ navigation }: Props) {
     const [todayUsers, setTodayUsers] = useState(0)
     const [insight, setInsight] = useState('')
     const [displayedInsight, setDisplayedInsight] = useState('')
-
-    const themedStyles = useMemo(
-        () => ({
-            errorBox: { backgroundColor: theme.colors.errorContainer },
-            errorText: { color: theme.colors.onErrorContainer },
-            formCard: { backgroundColor: theme.colors.surface },
-            page: { backgroundColor: '#E8F0E7' },
-            statText: { color: '#7C9A79' },
-        }),
-        [
-            theme.colors.errorContainer,
-            theme.colors.onErrorContainer,
-            theme.colors.surface,
-        ]
-    )
 
     useEffect(() => {
         const randomUsers = Math.floor(Math.random() * 500) + 200
@@ -115,10 +99,10 @@ export function LoginScreen({ navigation }: Props) {
     return (
         <KeyboardAvoidingView
             behavior={Platform.select({ ios: 'padding', android: undefined })}
-            style={[styles.page, themedStyles.page]}
+            style={[authSharedStyles.page, themed.page]}
         >
             <ScrollView
-                contentContainerStyle={styles.pageContent}
+                contentContainerStyle={authSharedStyles.scrollContent}
                 horizontal={false}
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 keyboardShouldPersistTaps="handled"
@@ -127,37 +111,37 @@ export function LoginScreen({ navigation }: Props) {
                 showsHorizontalScrollIndicator={false}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.brandSection}>
-                    <Text style={styles.brandTitle}>FoodPrint</Text>
-                    <View style={styles.statRow}>
+                <View style={authSharedStyles.brandSection}>
+                    <Text style={authSharedStyles.brandTitle}>FoodPrint</Text>
+                    <View style={authSharedStyles.statRow}>
                         <MaterialCommunityIcons
-                            color={themedStyles.statText.color}
+                            color={themed.statText.color}
                             name="account-group-outline"
                             size={20}
                         />
-                        <Text style={[styles.statText, themedStyles.statText]}>
+                        <Text style={[authSharedStyles.statText, themed.statText]}>
                             {todayUsers} people started their nutrition journey today
                         </Text>
                     </View>
-                    <View style={styles.insightCard}>
-                        <Text style={styles.insightText}>
+                    <View style={authSharedStyles.insightCard}>
+                        <Text style={authSharedStyles.insightText}>
                             {displayedInsight}
-                            <Text style={styles.cursor}>|</Text>
+                            <Text style={authSharedStyles.cursor}>|</Text>
                         </Text>
                     </View>
                 </View>
 
-                <View style={[styles.formCard, themedStyles.formCard]}>
-                    <Text style={styles.formTitle}>Welcome Back</Text>
+                <View style={[authSharedStyles.formCard, themed.formCard]}>
+                    <Text style={authSharedStyles.formTitle}>Welcome Back</Text>
 
                     {error ? (
-                        <View style={[styles.errorBox, themedStyles.errorBox]}>
+                        <View style={[authSharedStyles.errorBox, themed.errorBox]}>
                             <MaterialCommunityIcons
-                                color={themedStyles.errorText.color}
+                                color={themed.errorText.color}
                                 name="alert-circle-outline"
                                 size={20}
                             />
-                            <Text style={[styles.errorText, themedStyles.errorText]}>
+                            <Text style={[authSharedStyles.errorText, themed.errorText]}>
                                 {error}
                             </Text>
                         </View>
@@ -171,7 +155,7 @@ export function LoginScreen({ navigation }: Props) {
                         left={<TextInput.Icon icon="email-outline" />}
                         mode="outlined"
                         onChangeText={setEmail}
-                        style={styles.input}
+                        style={authSharedStyles.input}
                         textContentType="emailAddress"
                         value={email}
                     />
@@ -184,7 +168,7 @@ export function LoginScreen({ navigation }: Props) {
                         onSubmitEditing={Keyboard.dismiss}
                         returnKeyType="done"
                         secureTextEntry
-                        style={styles.input}
+                        style={authSharedStyles.input}
                         textContentType="password"
                         value={password}
                     />
@@ -192,26 +176,24 @@ export function LoginScreen({ navigation }: Props) {
                     <Button
                         compact
                         mode="text"
-                        onPress={() =>
-                            Alert.alert('Notice', 'Password reset is coming soon.')
-                        }
-                        style={styles.forgotButton}
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                        style={authSharedStyles.forgotLink}
                     >
                         <Text>Forgot Password?</Text>
                     </Button>
 
                     <Button
-                        buttonColor="#8BA888"
+                        buttonColor={AUTH_PRIMARY_BUTTON}
                         disabled={submitting}
                         loading={submitting}
                         mode="contained"
                         onPress={() => void onLogin()}
-                        style={styles.signInButton}
+                        style={authSharedStyles.primaryButton}
                     >
                         <Text>{submitting ? 'Signing In...' : 'Sign In'}</Text>
                     </Button>
 
-                    <View style={styles.registerRow}>
+                    <View style={authSharedStyles.linkRow}>
                         <Text>Don&apos;t have an account?</Text>
                         <Button
                             compact
@@ -222,8 +204,8 @@ export function LoginScreen({ navigation }: Props) {
                         </Button>
                     </View>
                 </View>
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>
+                <View style={authSharedStyles.footer}>
+                    <Text style={authSharedStyles.footerText}>
                         By continuing, you agree to our Terms of Service and Privacy Policy
                     </Text>
                 </View>
@@ -232,114 +214,3 @@ export function LoginScreen({ navigation }: Props) {
         </KeyboardAvoidingView>
     )
 }
-
-const styles = StyleSheet.create({
-    brandSection: {
-        marginBottom: 20,
-    },
-    brandTitle: {
-        color: '#2F3E2D',
-        fontSize: 38,
-        fontWeight: '700',
-        marginBottom: 14,
-        textAlign: 'center',
-    },
-    cursor: {
-        color: '#8BA888',
-    },
-    errorBox: {
-        alignItems: 'flex-start',
-        borderRadius: 12,
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 14,
-        padding: 12,
-    },
-    errorText: {
-        flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
-    },
-    footer: {
-        marginTop: 16,
-    },
-    footerText: {
-        color: '#66756A',
-        fontSize: 12,
-        textAlign: 'center',
-    },
-    forgotButton: {
-        alignSelf: 'flex-end',
-        marginBottom: 10,
-    },
-    formCard: {
-        borderRadius: 24,
-        elevation: 3,
-        padding: 22,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-    },
-    formTitle: {
-        color: '#324032',
-        fontSize: 28,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    input: {
-        marginBottom: 16,
-    },
-    insightCard: {
-        alignItems: 'center',
-        backgroundColor: '#F5F8F5',
-        borderRadius: 18,
-        justifyContent: 'center',
-        minHeight: 86,
-        padding: 14,
-    },
-    insightText: {
-        color: '#4E5D4D',
-        fontSize: 13,
-        fontStyle: 'italic',
-        lineHeight: 19,
-        textAlign: 'center',
-    },
-    mockHint: {
-        color: '#7B8778',
-        fontSize: 13,
-        marginBottom: 16,
-    },
-    page: {
-        flex: 1,
-    },
-    pageContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        paddingHorizontal: 18,
-        paddingVertical: 24,
-    },
-    registerRow: {
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 10,
-    },
-    signInButton: {
-        borderRadius: 14,
-        marginTop: 2,
-        paddingVertical: 2,
-    },
-    statRow: {
-        alignItems: 'center',
-        flexDirection: 'row',
-        gap: 6,
-        justifyContent: 'center',
-        marginBottom: 10,
-    },
-    statText: {
-        fontSize: 13,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-})
