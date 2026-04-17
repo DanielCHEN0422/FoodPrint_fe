@@ -13,19 +13,9 @@ export function useCommunityStyles() {
     
     return useMemo(
         () => StyleSheet.create({
-container: {
+    container: {
         flex: 1,
         backgroundColor: colors.background,
-    },
-    header: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 20,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: colors.onSurface,
     },
     section: {
         marginBottom: 24,

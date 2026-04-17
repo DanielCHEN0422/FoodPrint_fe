@@ -108,8 +108,8 @@ export function OnboardingScreen() {
             activityLevel === 'low'
                 ? 1.2
                 : activityLevel === 'high'
-                  ? 1.55
-                  : 1.375
+                    ? 1.55
+                    : 1.375
 
         let tdee = bmr * activityMultiplier
         if (goal === 'lose') {

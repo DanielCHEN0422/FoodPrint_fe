@@ -10,7 +10,7 @@ const isSupabaseConfigured =
 
 if (!isSupabaseConfigured) {
     console.warn(
-        '[FoodPrint] SUPABASE_URL / SUPABASE_ANON_KEY 未配置或为占位值，Supabase 登录与 API 可能失败。请在 .env 中配置 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY。'
+        '[FoodPrint] SUPABASE_URL / SUPABASE_ANON_KEY is missing or still a placeholder. Supabase sign-in and APIs may fail. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.'
     )
 }
 

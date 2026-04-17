@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar'
-import { Text, View, ScrollView, FlatList, TouchableOpacity, SafeAreaView } from 'react-native'
+import { Text, View, ScrollView, FlatList, TouchableOpacity } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 // Import from modularized structure
 import { useCommunityState, useCommunityStyles } from './hooks'
@@ -116,17 +117,19 @@ export function CommunityScreen() {
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: communityStyles.container.backgroundColor }}>
-            <ScrollView style={communityStyles.container} showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View style={communityStyles.header}>
-                    <Text style={communityStyles.title}>FoodPrint</Text>
-                </View>
-
+        <SafeAreaView
+            style={{ flex: 1, backgroundColor: communityStyles.container.backgroundColor }}
+            edges={['left', 'right']}
+        >
+            <ScrollView
+                style={communityStyles.container}
+                contentContainerStyle={{ paddingTop: 16 }}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Community Challenges Section */}
                 <View style={communityStyles.section}>
                     <View style={communityStyles.sectionHeader}>
-                        <Text style={communityStyles.sectionTitle}>Challenges</Text>
+                        <Text style={communityStyles.sectionTitle}>Community Challenges</Text>
                         <View style={communityStyles.buttonGroup}>
                             {isPremium && (
                                 <TouchableOpacity

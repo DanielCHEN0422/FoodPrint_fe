@@ -1,6 +1,6 @@
 export type RootTabParamList = {
     Home: undefined
-    Record: undefined
+    AIChat: undefined
     Community: undefined
     Profile: undefined
 }

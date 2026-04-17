@@ -25,6 +25,15 @@
         },
         "web": {
             "favicon": "./assets/favicon.png"
-        }
+        },
+        "plugins": [
+            [
+                "expo-image-picker",
+                {
+                    "photosPermission": "Allow FoodPrint to choose photos for meal logging.",
+                    "cameraPermission": "Allow FoodPrint to take photos for meal logging."
+                }
+            ]
+        ]
     }
 }

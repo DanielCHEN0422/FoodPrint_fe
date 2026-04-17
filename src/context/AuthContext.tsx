@@ -24,6 +24,8 @@ type AuthContextValue = {
     isPasswordRecovery: boolean
     hasCompletedOnboarding: boolean
     isLoading: boolean
+    /** Supabase Auth user.id，用于 food-logs 等需 userId 请求头的接口 */
+    authUserId: string | null
     userProfile: UserProfile | null
     userEmail: string | null
     completeOnboarding: () => Promise<void>
@@ -92,6 +94,7 @@ export function evaluatePasswordStrength(password: string): PasswordStrength {
 export function AuthProvider({ children }: PropsWithChildren) {
     const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true)
     const [isLoading, setIsLoading] = useState(true)
+    const [authUserId, setAuthUserId] = useState<string | null>(null)
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
@@ -103,6 +106,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 const {
                     data: { session },
                 } = await supabase.auth.getSession()
+                setAuthUserId(session?.user?.id ?? null)
                 if (session?.user?.email) {
                     setUserEmail(session.user.email)
                 }
@@ -151,6 +155,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             } catch {
                 await AsyncStorage.removeItem(AUTH_SESSION_KEY)
                 await AsyncStorage.removeItem(AUTH_ONBOARDING_KEY)
+                setAuthUserId(null)
                 setUserEmail(null)
                 setIsPasswordRecovery(false)
                 setHasCompletedOnboarding(true)
@@ -164,6 +169,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event, session) => {
+            setAuthUserId(session?.user?.id ?? null)
             setUserEmail(session?.user?.email ?? null)
             if (event === 'PASSWORD_RECOVERY') {
                 setIsPasswordRecovery(true)
@@ -193,6 +199,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 return { success: false, message: msg }
             }
             setUserEmail(data.user?.email ?? normalizedEmail)
+            setAuthUserId(data.user?.id ?? null)
             setIsPasswordRecovery(false)
             setHasCompletedOnboarding(true)
             await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
@@ -223,6 +230,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             }
             const sessionEmail = data.user?.email ?? normalizedEmail
             setUserEmail(sessionEmail)
+            setAuthUserId(data.user?.id ?? null)
             setIsPasswordRecovery(false)
             setHasCompletedOnboarding(false)
             setUserProfile(null)
@@ -234,6 +242,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const logout = useCallback(async () => {
         setHasCompletedOnboarding(true)
+        setAuthUserId(null)
         setIsPasswordRecovery(false)
         setUserEmail(null)
         try {
@@ -271,6 +280,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             isPasswordRecovery,
             hasCompletedOnboarding,
             isLoading,
+            authUserId,
             userProfile,
             userEmail,
             completeOnboarding,
@@ -280,6 +290,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             updateProfile,
         }),
         [
+            authUserId,
             completeOnboarding,
             hasCompletedOnboarding,
             isLoading,

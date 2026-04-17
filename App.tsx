@@ -2,6 +2,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
 import { useColorScheme } from 'react-native'
 import { Provider as PaperProvider } from 'react-native-paper'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AuthProvider } from './src/context/AuthContext'
 import { AppNavigator } from './src/navigation/AppNavigator'
@@ -14,13 +15,15 @@ export default function App() {
     const navigationTheme = getNavigationTheme(isDark ? 'dark' : 'light')
 
     return (
-        <PaperProvider theme={paperTheme}>
-            <AuthProvider>
-                <NavigationContainer theme={navigationTheme}>
-                    <AppNavigator />
-                    <StatusBar style={colorScheme === 'dark' ? 'light' : 'auto'} />
-                </NavigationContainer>
-            </AuthProvider>
-        </PaperProvider>
+        <SafeAreaProvider style={{ flex: 1 }}>
+            <PaperProvider theme={paperTheme}>
+                <AuthProvider>
+                    <NavigationContainer theme={navigationTheme}>
+                        <AppNavigator />
+                        <StatusBar style={colorScheme === 'dark' ? 'light' : 'auto'} />
+                    </NavigationContainer>
+                </AuthProvider>
+            </PaperProvider>
+        </SafeAreaProvider>
     )
 }

@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar'
 import { useMemo, useState } from 'react'
-import { View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from 'react-native-paper'
 
 import { useAuth } from '../context/AuthContext'
@@ -56,7 +56,10 @@ export function ProfileScreen() {
         : null
 
     return (
-        <View style={[styles.page, { backgroundColor: palette.page }]}>
+        <SafeAreaView
+            style={[styles.page, { backgroundColor: palette.page }]}
+            edges={['left', 'right']}
+        >
             <ProfileOverview
                 achievements={achievements}
                 averageCalories={averageCalories}
@@ -123,6 +126,6 @@ export function ProfileScreen() {
             />
 
             <StatusBar style="auto" />
-        </View>
+        </SafeAreaView>
     )
 }

@@ -9,7 +9,7 @@
 export function getMockToken(): string {
     // 返回一个mock token，仅用于开发测试
     // 在真实环境中这应该是有效的JWT
-    return 'mock-jwt-token-for-testing';
+    return 'mock-jwt-token-for-testing'
 }
 
 /**
@@ -21,12 +21,11 @@ export async function getUserToken(): Promise<string | null> {
         // TODO: 实际应用中应该这样获取：
         // const { data: { session } } = await supabaseClient.auth.getSession();
         // return session?.access_token || null;
-        
+
         // 当前返回mock token用于测试
-        return getMockToken();
-    } catch (error) {
-        console.error('Failed to get user token:', error);
-        return null;
+        return getMockToken()
+    } catch {
+        return null
     }
 }
 
@@ -34,8 +33,8 @@ export async function getUserToken(): Promise<string | null> {
  * 检查用户是否已登录
  */
 export async function isUserLoggedIn(): Promise<boolean> {
-    const token = await getUserToken();
-    return token !== null && token !== 'mock-jwt-token-for-testing';
+    const token = await getUserToken()
+    return token !== null && token !== 'mock-jwt-token-for-testing'
 }
 
 /**
@@ -43,5 +42,5 @@ export async function isUserLoggedIn(): Promise<boolean> {
  * 生产环境中删除这个函数
  */
 export function isDevelopmentMode(): boolean {
-    return __DEV__ || process.env.NODE_ENV === 'development';
+    return __DEV__ || process.env.NODE_ENV === 'development'
 }
