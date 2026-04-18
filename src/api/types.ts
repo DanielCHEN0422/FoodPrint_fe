@@ -178,6 +178,29 @@ export interface ImpactMetricsResponse {
 }
 
 // ---------- Challenge 模块 ----------
+export interface NutritionSnapshot {
+  calories: number;
+  protein_g: number;
+  fat_g: number;
+  carbs_g: number;
+  fiber_g: number;
+  water_ml: number;
+  calories_burned: number;
+  food_log_count: number;
+}
+
+export interface TodayStatusResponse {
+  checkedIn: boolean;
+  passed: boolean | null;
+  currentValue: number;
+  targetValue: number;
+  summary: string;
+  daysRemaining: number;
+  currentStreak: number;
+  progressPercent: number;
+  nutritionSnapshot?: NutritionSnapshot | null;
+}
+
 export interface ChallengeResponse {
   id: string;
   title: string;
@@ -187,6 +210,15 @@ export interface ChallengeResponse {
   targetValue: number;
   badgeIcon?: string | null;
   createdAt?: string;
+}
+
+export interface CreateChallengeRequest {
+  title: string;
+  description: string;
+  type: string;
+  duration_days: number;
+  target_value?: number;
+  badge_icon?: string;
 }
 
 export interface CheckinResponse {

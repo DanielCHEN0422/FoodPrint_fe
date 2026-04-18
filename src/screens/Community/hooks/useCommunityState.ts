@@ -21,8 +21,10 @@ import {
 import {
   abandonChallenge,
   checkinChallenge,
+  createChallenge,
   getChallenges,
   getMyChallenges,
+  getTodayStatus,
   getUserChallengeDetail,
   joinChallenge,
 } from '../../../api/challenge';
@@ -375,6 +377,16 @@ export const useCommunityState = () => {
 
       if (!target?.userChallengeId) {
         Alert.alert('Join first', 'Please join this challenge before checking in.');
+        return;
+      }
+
+      // 在 checkin 前刷新一下这个 userChallenge 的最新状态，确保是 IN_PROGRESS
+      const latestDetail = await getUserChallengeDetail(target.userChallengeId);
+      if (latestDetail.data?.status !== 'IN_PROGRESS') {
+        Alert.alert(
+          'Challenge Not Active',
+          `This challenge is no longer active (status: ${latestDetail.data?.status}). Please try to rejoin.`
+        );
         return;
       }
 
@@ -760,45 +772,116 @@ export const useCommunityState = () => {
     setDescError('');
   };
 
-  const handleCreateChallenge = (selectedType: any) => {
-    if (!formData.title || !formData.description || !formData.duration) {
+  const handleCreateChallenge = async (selectedType: any) => {
+    // 验证必填字段
+    if (!formData.title?.trim()) {
+      Alert.alert('Validation Error', 'Challenge title is required.');
       return;
     }
 
-    const selectedBadge = BADGE_DESIGNS[formData.badge];
-    
-    // 生成 UUID v4 格式的 ID
-    const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
+    if (!formData.duration || parseInt(formData.duration) <= 0) {
+      Alert.alert('Validation Error', 'Duration must be at least 1 day.');
+      return;
+    }
 
-    const newChallenge: CommunityChallenge = {
-      id: generateUUID(),
-      title: formData.title,
-      description: formData.description,
-      icon: selectedType?.icon || '🏆',
-      duration: `${formData.duration} Days`,
-      participants: 0,
-      color: formData.color,
-      joined: true,
-      fullDescription: formData.description,
-      badge: {
-        name: `${formData.title} ${selectedBadge.name}`,
-        image: '',
-        description: `Complete the ${formData.title} challenge to earn this badge!`,
-        icon: selectedBadge.icon,
-        badgeGradient: selectedBadge.gradient,
-      },
-      topParticipants: [],
-    };
+    if (!selectedType?.id) {
+      Alert.alert('Validation Error', 'Please select a challenge type.');
+      return;
+    }
 
-    setChallenges([...challenges, newChallenge]);
-    setShowCreateChallenge(false);
-    resetChallengeForm();
+    try {
+      // 映射前端类型到系统类型
+      // ⚠️ 重要：后端限制每个 type 只能创建一个 challenge
+      // 用户在创建时必须选择一个系统类型
+      const typeMapping: Record<string, string> = {
+        nutrition: 'CALORIE_CONTROL',
+        hydration: 'LOW_CARB',
+        restriction: 'PROTEIN_CHAMPION',
+        fitness: 'LOG_STREAK',
+        habit: 'LIGHT_EATER',
+      };
+
+      const backendType = typeMapping[selectedType.id];
+      
+      if (!backendType) {
+        Alert.alert('Error', 'Invalid challenge type selected.');
+        return;
+      }
+
+      // 检查是否已经创建过这个类型的 challenge
+      const existingChallenge = challenges.find(c => c.type === backendType);
+      if (existingChallenge) {
+        Alert.alert(
+          'Already Created',
+          `You have already created a "${backendType.replace(/_/g, ' ')}" challenge. Each challenge type can only be created once.`
+        );
+        return;
+      }
+
+      const requestPayload = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || '',
+        type: backendType, // ← 使用系统类型而不是 UUID
+        duration_days: parseInt(formData.duration),
+        target_value: 0,
+        badge_icon: '🏆',
+      };
+
+      console.log('📤 Creating challenge with payload:', requestPayload);
+
+      const response = await createChallenge(requestPayload);
+
+      console.log('📥 Create challenge response:', response);
+
+      if (response.code === 200 && response.data) {
+        // 后端返回的 challenge 数据
+        const newChallengeData = response.data;
+        const selectedBadge = BADGE_DESIGNS[formData.badge] || BADGE_DESIGNS[0];
+
+        // 构造前端的 CommunityChallenge 对象
+        const newChallenge: CommunityChallenge = {
+          id: newChallengeData.id,
+          userChallengeId: undefined,
+          title: newChallengeData.title,
+          description: newChallengeData.description,
+          icon: newChallengeData.badgeIcon || '🏆',
+          duration: `${newChallengeData.durationDays} Days`,
+          participants: 0,
+          color: formData.color,
+          joined: false,
+          fullDescription: newChallengeData.description,
+          type: newChallengeData.type,
+          targetValue: newChallengeData.targetValue,
+          badge: {
+            name: `${newChallengeData.title} Badge`,
+            image: '',
+            description: `Complete ${newChallengeData.durationDays} days of ${newChallengeData.title} to earn this badge.`,
+            icon: selectedBadge.icon,
+            badgeGradient: selectedBadge.gradient,
+          },
+          topParticipants: [],
+        };
+
+        setChallenges([...challenges, newChallenge]);
+        setShowCreateChallenge(false);
+        resetChallengeForm();
+
+        Alert.alert('Success', `Challenge "${newChallengeData.title}" created! Now join it to start.`);
+      } else {
+        console.error('❌ Create challenge failed:', response);
+        Alert.alert('Error', response.message || 'Failed to create challenge');
+      }
+    } catch (error) {
+      console.error('❌ Failed to create challenge:', error);
+      let errorMessage = 'Failed to create challenge';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error('Error details:', error.message);
+      }
+
+      Alert.alert('Error', errorMessage);
+    }
   };
 
   return {

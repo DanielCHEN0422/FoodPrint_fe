@@ -16,6 +16,22 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
 }) => {
   const hasActiveRun = challenge.joined && !!challenge.userChallengeId;
 
+  // UUID regex pattern to detect if type is a UUID (custom created)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    challenge.type || ''
+  );
+
+  // Get display text for type - hide UUID for custom challenges
+  const getTypeDisplay = () => {
+    if (hasActiveRun) {
+      return `${challenge.progressPercent ?? 0}% complete`;
+    }
+    if (isUUID) {
+      return 'Custom';
+    }
+    return challenge.type?.replace(/_/g, ' ') || 'Challenge';
+  };
+
   return (
     <TouchableOpacity
       onPress={() => onPress(challenge)}
@@ -48,9 +64,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({
       </Text>
       <View style={styles.footer}>
         <Text style={styles.participants}>
-          {hasActiveRun
-            ? `${challenge.progressPercent ?? 0}% complete`
-            : `${challenge.type?.replace(/_/g, ' ') || 'Challenge'}`}
+          {getTypeDisplay()}
         </Text>
         <TouchableOpacity
           onPress={(e: GestureResponderEvent) => {

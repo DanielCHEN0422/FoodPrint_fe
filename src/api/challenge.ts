@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   ChallengeResponse,
   CheckinResponse,
+  CreateChallengeRequest,
+  TodayStatusResponse,
   UserChallengeResponse,
 } from './types';
 import { supabase } from '../lib/supabase';
@@ -28,6 +30,26 @@ async function userIdHeader(): Promise<Record<string, string>> {
 /** GET /api/challenges - 获取所有系统挑战模板 */
 export async function getChallenges(): Promise<ApiResponse<ChallengeResponse[]>> {
   return apiGet<ChallengeResponse[]>(BASE, { requireAuth: true });
+}
+
+/** POST /api/challenges - 创建自定义挑战 (需要 JWT 认证) */
+export async function createChallenge(
+  data: CreateChallengeRequest
+): Promise<ApiResponse<ChallengeResponse>> {
+  return apiPost<ChallengeResponse>(BASE, data, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** GET /api/challenges/my/{userChallengeId}/today-status - 获取今天的挑战进度 */
+export async function getTodayStatus(
+  userChallengeId: string
+): Promise<ApiResponse<TodayStatusResponse>> {
+  return apiGet<TodayStatusResponse>(`${BASE}/my/${userChallengeId}/today-status`, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
 }
 
 /** POST /api/challenges/{challengeId}/join - 加入挑战 */
