@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import React, { useState } from 'react'
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     Pressable,
@@ -16,7 +17,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
 
+import { analyze } from '../api/ai'
+import type { UserNutritionContext } from '../api/types'
+import { StreamingAssistantMarkdown } from '../components/common/StreamingAssistantMarkdown'
 import { FloatingChatButton } from '../components/common/FloatingChatButton'
+import { useAuth } from '../context/AuthContext'
 
 // ─── Colors ──────────────────────────────────────────────────
 const COLORS = {
@@ -48,13 +53,6 @@ interface MealItem {
     time: string
     calories: number
     icon: keyof typeof MaterialCommunityIcons.glyphMap
-}
-
-interface ChatMessage {
-    id: string
-    text: string
-    sender: 'user' | 'assistant'
-    timestamp: Date
 }
 
 interface ChatMessage {
@@ -106,21 +104,6 @@ const MEAL_ICONS: { [key: string]: keyof typeof MaterialCommunityIcons.glyphMap 
     'Dinner': 'silverware-fork-knife',
     'Snack': 'apple',
 }
-
-const MOCK_CHAT_MESSAGES: ChatMessage[] = [
-    {
-        id: '1',
-        text: "Hi! I'm your FoodPrint assistant. How can I help with your meals today?",
-        sender: 'assistant',
-        timestamp: new Date(),
-    },
-    {
-        id: '2', 
-        text: 'How many calories are in 150g of chicken breast?',
-        sender: 'user',
-        timestamp: new Date(),
-    },
-]
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -235,6 +218,7 @@ function ChatModal({
     inputText,
     onInputChange,
     onSendMessage,
+    sending = false,
 }: {
     visible: boolean
     onClose: () => void
@@ -242,6 +226,7 @@ function ChatModal({
     inputText: string
     onInputChange: (text: string) => void
     onSendMessage: () => void
+    sending?: boolean
 }) {
     return (
         <Modal
@@ -276,17 +261,38 @@ function ChatModal({
                                         message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
                                     ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.messageText,
-                                            message.sender === 'user' ? styles.userText : styles.assistantText,
-                                        ]}
-                                    >
-                                        {message.text}
-                                    </Text>
+                                    {message.sender === 'user' ? (
+                                        <Text
+                                            style={[styles.messageText, styles.userText]}
+                                        >
+                                            {message.text}
+                                        </Text>
+                                    ) : (
+                                        <StreamingAssistantMarkdown
+                                            markdown={message.text}
+                                            textColor={COLORS.dark}
+                                            linkColor={COLORS.primary}
+                                        />
+                                    )}
                                 </View>
                             </View>
                         ))}
+                        {sending ? (
+                            <View style={[styles.messageContainer, styles.assistantMessage]}>
+                                <View
+                                    style={[
+                                        styles.messageBubble,
+                                        styles.assistantBubble,
+                                        styles.thinkingBubble,
+                                    ]}
+                                >
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                    <Text style={[styles.messageText, styles.assistantText, styles.thinkingLabel]}>
+                                        Thinking...
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : null}
                     </ScrollView>
 
                     {/* Input Area */}
@@ -303,16 +309,20 @@ function ChatModal({
                         <Pressable
                             style={[
                                 styles.sendButton,
-                                !inputText.trim() && styles.sendButtonDisabled,
+                                (!inputText.trim() || sending) && styles.sendButtonDisabled,
                             ]}
                             onPress={onSendMessage}
-                            disabled={!inputText.trim()}
+                            disabled={!inputText.trim() || sending}
                         >
-                            <Ionicons
-                                name="send"
-                                size={18}
-                                color={inputText.trim() ? '#fff' : COLORS.sub}
-                            />
+                            {sending ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Ionicons
+                                    name="send"
+                                    size={18}
+                                    color={inputText.trim() && !sending ? '#fff' : COLORS.sub}
+                                />
+                            )}
                         </Pressable>
                     </View>
                 </View>
@@ -327,6 +337,18 @@ function ChatModal({
 // ─── Main Component ──────────────────────────────────────────
 export function HomeScreen() {
     const navigation = useNavigation<HomeScreenNavigationProp>()
+    const { userProfile } = useAuth()
+
+    const userContext: UserNutritionContext | undefined = userProfile
+        ? {
+              heightCm: userProfile.height,
+              weightKg: userProfile.weight,
+              age: userProfile.age,
+              gender: userProfile.gender,
+              goal: userProfile.goal,
+              dailyCalorieTarget: userProfile.dailyCalories,
+          }
+        : undefined
 
     // ─── State Management ─────────────────────────────────────
     const [meals, setMeals] = useState<MealItem[]>(MOCK_MEALS)
@@ -340,7 +362,8 @@ export function HomeScreen() {
     // Chat-related state
     const [chatVisible, setChatVisible] = useState(false)
     const [chatInput, setChatInput] = useState('')
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES)
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+    const [sendingMessage, setSendingMessage] = useState(false)
 
     // ─── Computed Values ──────────────────────────────────────
     const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0)
@@ -404,28 +427,58 @@ export function HomeScreen() {
         setChatVisible(false)
     }
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         const messageText = chatInput.trim()
         if (!messageText) return
 
-        // Add user message
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
             text: messageText,
             sender: 'user',
             timestamp: new Date(),
         }
-
-        // Add mock assistant response
-        const assistantMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            text: 'Thanks! AI response will be connected later.',
-            sender: 'assistant', 
-            timestamp: new Date(),
-        }
-
-        setChatMessages(prev => [...prev, userMessage, assistantMessage])
+        setChatMessages(prev => [...prev, userMessage])
         setChatInput('')
+        setSendingMessage(true)
+
+        try {
+            const res = await analyze({ text: messageText, userContext })
+            const data = res.data
+            let reply: string
+
+            if (!data) {
+                reply = 'No response from AI'
+            } else if (data.type === 'PROFILE_NEEDED' && data.profilePrompt) {
+                reply = data.profilePrompt
+            } else if (data.adviceText) {
+                reply = data.adviceText
+            } else if (data.type === 'FOOD_ANALYSIS' && data.foodAnalysis) {
+                const s = data.foodAnalysis.summary
+                const foods =
+                    data.foodAnalysis.foods?.map(f => f.nameEn || f.nameZh).join(', ') || ''
+                reply = `Detected: ${foods}\nCalories: ${s?.totalCalories ?? '-'} kcal | Protein: ${s?.totalProteinG ?? '-'}g | Fat: ${s?.totalFatG ?? '-'}g | Carbs: ${s?.totalCarbsG ?? '-'}g`
+            } else {
+                reply = res.message || 'No response from AI'
+            }
+            const assistantMessage: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                text: reply,
+                sender: 'assistant',
+                timestamp: new Date(),
+            }
+            setChatMessages(prev => [...prev, assistantMessage])
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Unknown error'
+            const assistantMessage: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                text: `Error: ${msg}`,
+                sender: 'assistant',
+                timestamp: new Date(),
+            }
+            setChatMessages(prev => [...prev, assistantMessage])
+        } finally {
+            setSendingMessage(false)
+        }
     }
     return (
         <SafeAreaView style={styles.safe}>
@@ -527,6 +580,7 @@ export function HomeScreen() {
                 inputText={chatInput}
                 onInputChange={setChatInput}
                 onSendMessage={handleSendMessage}
+                sending={sendingMessage}
             />
 
             {/* ── View All Modal ── */}
@@ -1013,6 +1067,16 @@ const styles = StyleSheet.create({
     },
     assistantText: {
         color: COLORS.dark,
+    },
+    thinkingBubble: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        minWidth: 120,
+    },
+    thinkingLabel: {
+        fontSize: 14,
+        opacity: 0.85,
     },
     chatInputArea: {
         flexDirection: 'row',
