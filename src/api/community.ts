@@ -69,3 +69,15 @@ export async function joinTopic(topicName: string): Promise<ApiResponse<unknown>
 export async function getMyTopics(): Promise<ApiResponse<string[]>> {
     return apiGet<string[]>(`${BASE}/my-topics`, { requireAuth: true })
 }
+
+/** DELETE /api/community/posts/{id} - 删除帖子 */
+export async function deletePost(postId: string | number): Promise<ApiResponse<unknown>> {
+    return apiDelete(`${BASE}/posts/${postId}`, { requireAuth: true })
+}
+
+/** DELETE /api/community/comments/{id} - 删除评论 */
+export async function deleteComment(
+    commentId: string | number
+): Promise<ApiResponse<unknown>> {
+    return apiDelete(`${BASE}/comments/${commentId}`, { requireAuth: true })
+}

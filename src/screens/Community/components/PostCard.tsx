@@ -8,6 +8,8 @@ interface PostCardProps {
     onCommentPress: (postId: string) => void
     onFollowPress?: (authorId: string) => void
     isFollowed?: boolean
+    currentUserId?: string
+    onDeletePress?: (postId: string) => void
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -16,6 +18,8 @@ export const PostCard: React.FC<PostCardProps> = ({
     onCommentPress,
     onFollowPress,
     isFollowed = false,
+    currentUserId,
+    onDeletePress,
 }) => {
     return (
         <View style={styles.card}>
@@ -25,7 +29,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                     <Text style={styles.name}>{post.authorName}</Text>
                     <Text style={styles.timestamp}>{post.timestamp}</Text>
                 </View>
-                {onFollowPress && (
+                {onFollowPress && post.authorId !== currentUserId && (
                     <TouchableOpacity
                         style={[styles.followButton, isFollowed && styles.followButtonFollowed]}
                         onPress={() => onFollowPress(post.authorId)}
@@ -38,6 +42,14 @@ export const PostCard: React.FC<PostCardProps> = ({
                         >
                             {isFollowed ? 'Following' : '+ Follow'}
                         </Text>
+                    </TouchableOpacity>
+                )}
+                {onDeletePress && post.authorId === currentUserId && (
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => onDeletePress(post.id)}
+                    >
+                        <Text style={styles.deleteButtonText}>Delete</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -148,5 +160,17 @@ const styles = StyleSheet.create({
     },
     followButtonTextFollowed: {
         color: '#6D8A6B',
+    },
+    deleteButton: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        marginLeft: 8,
+        borderRadius: 4,
+        backgroundColor: '#FFE5E5',
+    },
+    deleteButtonText: {
+        fontSize: 12,
+        color: '#D32F2F',
+        fontWeight: '500',
     },
 })

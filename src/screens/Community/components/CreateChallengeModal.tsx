@@ -323,7 +323,8 @@ export function CreateChallengeModal({
                                     >
                                         <View style={styles.previewHeader}>
                                             <Text style={styles.previewIcon}>
-                                                {formData.selectedTypeData?.icon}
+                                                {BADGE_DESIGNS[formData.badge]?.icon ||
+                                                    formData.selectedTypeData?.icon}
                                             </Text>
                                             <View>
                                                 <Text style={styles.previewTitle2}>

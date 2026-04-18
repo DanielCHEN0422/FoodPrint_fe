@@ -18,6 +18,8 @@ interface CommentModalProps {
     activeCommentPost: Post | null
     onClose: () => void
     onSubmitComment: (postId: string, text: string) => Promise<void>
+    currentUserId?: string
+    onDeleteComment?: (postId: string, commentId: string) => void
 }
 
 export function CommentModal({
@@ -25,6 +27,8 @@ export function CommentModal({
     activeCommentPost,
     onClose,
     onSubmitComment,
+    currentUserId,
+    onDeleteComment,
 }: CommentModalProps) {
     const [commentText, setCommentText] = useState('')
 
@@ -148,15 +152,55 @@ export function CommentModal({
                                         >
                                             {comment.text}
                                         </Text>
-                                        <Text
+                                        <View
                                             style={{
-                                                color: '#8D9B8B',
-                                                fontSize: 13,
+                                                flexDirection: 'row',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
                                                 marginTop: 8,
                                             }}
                                         >
-                                            {comment.timestamp}
-                                        </Text>
+                                            <Text
+                                                style={{
+                                                    color: '#8D9B8B',
+                                                    fontSize: 13,
+                                                }}
+                                            >
+                                                {comment.timestamp}
+                                            </Text>
+                                            {onDeleteComment &&
+                                                comment.authorId === currentUserId && (
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            if (
+                                                                activeCommentPost?.id &&
+                                                                onDeleteComment
+                                                            ) {
+                                                                onDeleteComment(
+                                                                    activeCommentPost.id,
+                                                                    comment.id
+                                                                );
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            paddingVertical: 4,
+                                                            paddingHorizontal: 8,
+                                                            borderRadius: 4,
+                                                            backgroundColor: '#FFE5E5',
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 12,
+                                                                color: '#D32F2F',
+                                                                fontWeight: '500',
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                        </View>
                                     </View>
                                 ))
                             )}

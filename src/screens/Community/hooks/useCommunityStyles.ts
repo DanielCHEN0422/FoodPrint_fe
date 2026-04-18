@@ -17,6 +17,17 @@ export function useCommunityStyles() {
         flex: 1,
         backgroundColor: colors.background,
     },
+    header: {
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+    },
+    title: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: colors.onSurface,
+    },
     section: {
         marginBottom: 24,
     },
@@ -456,9 +467,11 @@ export function useCommunityStyles() {
         flexDirection: 'row',
         flexWrap: 'wrap',
         marginBottom: 20,
+        marginHorizontal: -4,
+        justifyContent: 'space-between',
     },
     badgeOption: {
-        width: '32%',
+        width: '31%',
         paddingVertical: 14,
         paddingHorizontal: 8,
         borderWidth: 2,
@@ -466,8 +479,8 @@ export function useCommunityStyles() {
         borderRadius: 12,
         alignItems: 'center',
         backgroundColor: colors.onPrimary,
-        marginRight: '2%',
         marginBottom: 10,
+        marginHorizontal: 4,
     },
     badgeOptionSelected: {
         borderColor: colors.primary,
