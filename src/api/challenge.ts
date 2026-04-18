@@ -1,0 +1,85 @@
+import { apiDelete, apiGet, apiPost } from './client';
+import type {
+  ApiResponse,
+  ChallengeResponse,
+  CheckinResponse,
+  UserChallengeResponse,
+} from './types';
+import { supabase } from '../lib/supabase';
+
+const BASE = 'api/challenges';
+
+async function getCurrentUserId(): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const userId = session?.user?.id;
+  if (!userId) {
+    throw new Error('This endpoint requires login. Please sign in and try again.');
+  }
+  return userId;
+}
+
+async function userIdHeader(): Promise<Record<string, string>> {
+  return { userId: await getCurrentUserId() };
+}
+
+/** GET /api/challenges - 获取所有系统挑战模板 */
+export async function getChallenges(): Promise<ApiResponse<ChallengeResponse[]>> {
+  return apiGet<ChallengeResponse[]>(BASE, { requireAuth: true });
+}
+
+/** POST /api/challenges/{challengeId}/join - 加入挑战 */
+export async function joinChallenge(
+  challengeId: string
+): Promise<ApiResponse<UserChallengeResponse>> {
+  return apiPost<UserChallengeResponse>(`${BASE}/${challengeId}/join`, undefined, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** GET /api/challenges/my - 获取我的全部挑战记录 */
+export async function getMyChallenges(): Promise<ApiResponse<UserChallengeResponse[]>> {
+  return apiGet<UserChallengeResponse[]>(`${BASE}/my`, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** GET /api/challenges/my/active - 获取我的进行中挑战 */
+export async function getMyActiveChallenges(): Promise<ApiResponse<UserChallengeResponse[]>> {
+  return apiGet<UserChallengeResponse[]>(`${BASE}/my/active`, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** GET /api/challenges/my/{userChallengeId} - 获取挑战记录详情含打卡历史 */
+export async function getUserChallengeDetail(
+  userChallengeId: string
+): Promise<ApiResponse<UserChallengeResponse>> {
+  return apiGet<UserChallengeResponse>(`${BASE}/my/${userChallengeId}`, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** POST /api/challenges/my/{userChallengeId}/checkin - 今日打卡 */
+export async function checkinChallenge(
+  userChallengeId: string
+): Promise<ApiResponse<CheckinResponse>> {
+  return apiPost<CheckinResponse>(`${BASE}/my/${userChallengeId}/checkin`, undefined, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}
+
+/** DELETE /api/challenges/my/{userChallengeId} - 放弃进行中的挑战 */
+export async function abandonChallenge(userChallengeId: string): Promise<ApiResponse<unknown>> {
+  return apiDelete(`${BASE}/my/${userChallengeId}`, {
+    requireAuth: true,
+    headers: await userIdHeader(),
+  });
+}

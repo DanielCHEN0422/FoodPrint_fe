@@ -466,9 +466,11 @@ container: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         marginBottom: 20,
+        marginHorizontal: -4,
+        justifyContent: 'space-between',
     },
     badgeOption: {
-        width: '32%',
+        width: '31%',
         paddingVertical: 14,
         paddingHorizontal: 8,
         borderWidth: 2,
@@ -476,8 +478,8 @@ container: {
         borderRadius: 12,
         alignItems: 'center',
         backgroundColor: colors.onPrimary,
-        marginRight: '2%',
         marginBottom: 10,
+        marginHorizontal: 4,
     },
     badgeOptionSelected: {
         borderColor: colors.primary,
