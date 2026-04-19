@@ -9,4 +9,5 @@ export * from './food';
 export * from './ai';
 export * from './community';
 export * from './challenge';
+export * from './upload';
 export * from './types';

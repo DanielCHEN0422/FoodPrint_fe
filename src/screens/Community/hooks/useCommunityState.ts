@@ -28,6 +28,7 @@ import {
   getUserChallengeDetail,
   joinChallenge,
 } from '../../../api/challenge';
+import { uploadImageToSupabase } from '../../../api/upload';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -733,10 +734,25 @@ export const useCommunityState = () => {
       const title =
         newPostData.text.length > 30 ? newPostData.text.substring(0, 30) + '...' : newPostData.text;
 
+      let imageUrl: string | null = null;
+
+      // 如果有图片，先上传到 Supabase Storage
+      if (newPostData.image && newPostData.image.trim()) {
+        try {
+          console.log('📤 开始上传图片...');
+          imageUrl = await uploadImageToSupabase(newPostData.image, 'posts');
+          console.log('✅ 图片上传成功:', imageUrl);
+        } catch (uploadError) {
+          console.error('❌ 图片上传失败:', uploadError);
+          Alert.alert('Upload Failed', 'Failed to upload image. Post created without image.');
+          // 继续创建 post，只是没有图片
+        }
+      }
+
       const requestPayload = {
         title,
         content: newPostData.text,
-        imageUrl: newPostData.image || null,
+        imageUrl: imageUrl || null,
       };
 
       const response = await createPost(requestPayload);
@@ -751,6 +767,7 @@ export const useCommunityState = () => {
       setShowCreatePost(false);
     } catch (error) {
       console.error('❌ [Hook] 创建帖子失败:', error);
+      Alert.alert('Error', 'Failed to create post. Please try again.');
       throw error;
     }
   };

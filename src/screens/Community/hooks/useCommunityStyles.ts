@@ -261,8 +261,8 @@ export function useCommunityStyles() {
     },
     joinChallengeButton: {
         marginHorizontal: 16,
-        marginBottom: 32,
-        marginTop: 32,
+        marginBottom: 12,
+        marginTop: 12,
         paddingVertical: 16,
         backgroundColor: colors.primary,
         borderRadius: 14,
