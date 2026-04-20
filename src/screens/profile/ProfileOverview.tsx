@@ -1,26 +1,17 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import type { Dispatch, SetStateAction } from 'react'
-import { Image, Pressable, ScrollView, View } from 'react-native'
+import { Image, ScrollView, View } from 'react-native'
 import { Card, IconButton, ProgressBar, Text } from 'react-native-paper'
 
 import type { ImpactMetricsResponse, UserStatsDto } from '../../api/types'
-import {
-    buildChallengeStatusLabel,
-    formatChallengeSummarySubtitle,
-    formatTopicName,
-} from './data'
+import { buildChallengeStatusLabel, formatChallengeSummarySubtitle } from './data'
 import { styles } from './styles'
-import type {
-    AchievementEntry,
-    ChallengeSummary,
-    GoalEntry,
-    WeeklyEntry,
-} from './types'
+import type { ChallengeSummary, GoalEntry } from './types'
+
+const MOCK_STORE_BANNER_URI =
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80&auto=format&fit=crop'
 
 type ProfileOverviewProps = {
-    achievements: AchievementEntry[]
     avatarUrl: string
-    averageCalories: number
     challengeSummary: ChallengeSummary
     dashboardLoading: boolean
     dashboardNotice: string | null
@@ -28,24 +19,18 @@ type ProfileOverviewProps = {
     goals: GoalEntry[]
     impactMetrics: ImpactMetricsResponse | null
     memberSinceLabel: string
-    myTopics: string[]
     onOpenSettings: () => void
     palette: ReturnType<typeof import('./styles').getProfilePalette>
-    selectedDay: WeeklyEntry
-    setSelectedDay: Dispatch<SetStateAction<WeeklyEntry>>
     stats: UserStatsDto | null
     themeColors: {
         onSurfaceVariant: string
         primary: string
     }
     userEmail: string | null
-    weekData: WeeklyEntry[]
 }
 
 export function ProfileOverview({
-    achievements,
     avatarUrl,
-    averageCalories,
     challengeSummary,
     dashboardLoading,
     dashboardNotice,
@@ -53,15 +38,11 @@ export function ProfileOverview({
     goals,
     impactMetrics,
     memberSinceLabel,
-    myTopics,
     onOpenSettings,
     palette,
-    selectedDay,
-    setSelectedDay,
     stats,
     themeColors,
     userEmail,
-    weekData,
 }: ProfileOverviewProps) {
     const statsItems = [
         {
@@ -80,7 +61,6 @@ export function ProfileOverview({
             value: String(stats?.daysActive ?? 0),
         },
     ]
-    const topicPreview = myTopics.slice(0, 6)
     const bannerMessage =
         dashboardNotice ??
         (dashboardLoading
@@ -193,79 +173,6 @@ export function ProfileOverview({
                             </View>
                         ))}
                     </View>
-                </Card.Content>
-            </Card>
-
-            <Card style={[styles.sectionCard, { backgroundColor: palette.surface }]}>
-                <Card.Content style={styles.sectionContent}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Weekly Overview</Text>
-                        <MaterialCommunityIcons color="#4CAF50" name="trending-up" size={20} />
-                    </View>
-
-                    <View style={styles.chartRow}>
-                        {weekData.map((item) => {
-                            const isActive = item.day === selectedDay.day
-                            const height = Math.max(34, Math.round((item.calories / 2200) * 126))
-
-                            return (
-                                <Pressable
-                                    key={item.day}
-                                    onPress={() => setSelectedDay(item)}
-                                    style={styles.chartColumn}
-                                >
-                                    <Text style={[styles.chartValue, { color: palette.mutedText }]}>
-                                        {item.calories}
-                                    </Text>
-                                    <View
-                                        style={[
-                                            styles.chartTrack,
-                                            { backgroundColor: palette.chartTrack },
-                                        ]}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.chartBar,
-                                                {
-                                                    backgroundColor: isActive
-                                                        ? palette.activeBar
-                                                        : palette.inactiveBar,
-                                                    height,
-                                                },
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={[styles.chartDay, { color: palette.mutedText }]}>
-                                        {item.day}
-                                    </Text>
-                                </Pressable>
-                            )
-                        })}
-                    </View>
-
-                    <View
-                        style={[
-                            styles.chartSummary,
-                            { backgroundColor: palette.detailAccent },
-                        ]}
-                    >
-                        <Text style={styles.chartSummaryTitle}>{selectedDay.day} intake</Text>
-                        <Text
-                            style={[
-                                styles.chartSummaryValue,
-                                { color: palette.detailHighlight },
-                            ]}
-                        >
-                            {selectedDay.calories} calories
-                        </Text>
-                    </View>
-
-                    <Text style={[styles.averageText, { color: palette.mutedText }]}>
-                        Average:{' '}
-                        <Text style={[styles.averageValue, { color: palette.detailHighlight }]}>
-                            {averageCalories} cal/day
-                        </Text>
-                    </Text>
                 </Card.Content>
             </Card>
 
@@ -440,96 +347,28 @@ export function ProfileOverview({
             <Card style={[styles.sectionCard, { backgroundColor: palette.surface }]}>
                 <Card.Content style={styles.sectionContent}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Community Topics</Text>
+                        <Text style={styles.sectionTitle}>Featured Store</Text>
                         <MaterialCommunityIcons
                             color={palette.detailHighlight}
-                            name="tag-multiple-outline"
+                            name="storefront-outline"
                             size={20}
                         />
                     </View>
-
-                    <Text style={[styles.sectionCaption, { color: palette.mutedText }]}>
-                        {myTopics.length > 0
-                            ? `${myTopics.length} joined topics shaping your community feed`
-                            : 'Topics you join in Community will appear here.'}
-                    </Text>
-
-                    {topicPreview.length === 0 ? (
-                        <View
-                            style={[
-                                styles.emptyPanel,
-                                {
-                                    backgroundColor: palette.detailAccent,
-                                    borderColor: palette.detailBorder,
-                                },
-                            ]}
-                        >
-                            <Text style={styles.emptyTitle}>No topics joined yet</Text>
-                            <Text
-                                style={[
-                                    styles.emptySubtitle,
-                                    { color: palette.mutedText },
-                                ]}
-                            >
-                                Join sustainability or nutrition topics to personalize your feed.
-                            </Text>
-                        </View>
-                    ) : (
-                        <View style={styles.topicChipList}>
-                            {topicPreview.map((topic) => (
-                                <View
-                                    key={topic}
-                                    style={[
-                                        styles.topicChip,
-                                        {
-                                            backgroundColor: palette.detailAccent,
-                                            borderColor: palette.detailBorder,
-                                        },
-                                    ]}
-                                >
-                                    <Text style={styles.topicChipText}>
-                                        {formatTopicName(topic)}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-                    )}
-                </Card.Content>
-            </Card>
-
-            <Card style={[styles.sectionCard, { backgroundColor: palette.surface }]}>
-                <Card.Content style={styles.sectionContent}>
-                    <Text style={styles.sectionTitle}>Profile Highlights</Text>
-                    <View style={styles.achievementList}>
-                        {achievements.map((item) => (
-                            <View
-                                key={item.title}
-                                style={[
-                                    styles.achievementCard,
-                                    { backgroundColor: palette.accentSurface },
-                                ]}
-                            >
-                                <View style={styles.achievementIcon}>
-                                    <MaterialCommunityIcons color="#FFFFFF" name={item.icon} size={24} />
-                                </View>
-                                <View style={styles.achievementCopy}>
-                                    <Text style={styles.achievementTitle}>{item.title}</Text>
-                                    <Text
-                                        style={[
-                                            styles.achievementSubtitle,
-                                            { color: palette.mutedText },
-                                        ]}
-                                    >
-                                        {item.subtitle}
-                                    </Text>
-                                </View>
-                                <Text
-                                    style={[styles.achievementTime, { color: palette.mutedText }]}
-                                >
-                                    {item.time}
-                                </Text>
-                            </View>
-                        ))}
+                    <View
+                        style={[
+                            styles.mallAdImageWrap,
+                            {
+                                backgroundColor: palette.detailAccent,
+                                borderColor: palette.detailBorder,
+                            },
+                        ]}
+                    >
+                        <Image
+                            accessibilityLabel="Featured store promotion"
+                            resizeMode="cover"
+                            source={{ uri: MOCK_STORE_BANNER_URI }}
+                            style={styles.mallAdBanner}
+                        />
                     </View>
                 </Card.Content>
             </Card>

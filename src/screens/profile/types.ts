@@ -1,21 +1,9 @@
 import type MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 
-export type WeeklyEntry = {
-    calories: number
-    day: string
-}
-
 export type GoalEntry = {
     current: string
     label: string
     progress: number
-}
-
-export type AchievementEntry = {
-    icon: keyof typeof MaterialCommunityIcons.glyphMap
-    subtitle: string
-    time: string
-    title: string
 }
 
 export type SettingsTitle =

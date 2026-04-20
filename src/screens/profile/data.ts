@@ -1,38 +1,10 @@
-import type { UserStatsDto } from '../../api/types'
 import type { UserProfile } from '../../context/AuthContext'
 import type {
-    AchievementEntry,
     ChallengeHighlight,
     ChallengeSummary,
     GoalEntry,
     SettingsEntry,
-    WeeklyEntry,
 } from './types'
-
-export const weekData: WeeklyEntry[] = [
-    { day: 'Mon', calories: 1850 },
-    { day: 'Tue', calories: 2100 },
-    { day: 'Wed', calories: 1920 },
-    { day: 'Thu', calories: 2050 },
-    { day: 'Fri', calories: 1880 },
-    { day: 'Sat', calories: 2200 },
-    { day: 'Sun', calories: 1950 },
-]
-
-export const achievements: AchievementEntry[] = [
-    {
-        icon: 'trophy-outline',
-        subtitle: 'Logged meals for 7 days in a row',
-        time: 'Today',
-        title: '7-Day Streak',
-    },
-    {
-        icon: 'target',
-        subtitle: 'Met the calorie target 5 times this week',
-        time: '2 days ago',
-        title: 'Goal Crusher',
-    },
-]
 
 export const DEFAULT_PROFILE_AVATAR_URL =
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop'
@@ -159,45 +131,6 @@ export function getGoals(userProfile: UserProfile | null): GoalEntry[] {
             progress: userProfile?.dietPreference ? 1 : 0.35,
         },
     ]
-}
-
-export function buildAchievementHighlights(
-    stats: UserStatsDto | null
-): AchievementEntry[] {
-    if (!stats) {
-        return achievements
-    }
-
-    return [
-        {
-            icon: 'calendar-month-outline',
-            subtitle: 'Distinct days with meal logs recorded',
-            time: 'Live',
-            title: `${stats.daysActive} active days`,
-        },
-        {
-            icon: 'target',
-            subtitle: 'Current total reported by profile stats',
-            time: 'Live',
-            title: `${stats.goalsMet} goals met`,
-        },
-        {
-            icon: 'trophy-outline',
-            subtitle: 'Current total reported by profile stats',
-            time: 'Live',
-            title: `${stats.achievements} achievements`,
-        },
-    ]
-}
-
-export function formatTopicName(topicName: string) {
-    return topicName
-        .trim()
-        .toLowerCase()
-        .split(/[_\s-]+/)
-        .filter(Boolean)
-        .map((part) => part[0]?.toUpperCase() + part.slice(1))
-        .join(' ')
 }
 
 export function formatChallengeSummarySubtitle(summary: ChallengeSummary) {

@@ -1,20 +1,13 @@
 import { StatusBar } from 'expo-status-bar'
 import { useFocusEffect } from '@react-navigation/native'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from 'react-native-paper'
 
 import { getMyActiveChallenges, getMyChallenges } from '../api/challenge'
-import { getImpactMetrics, getMyTopics } from '../api/community'
-import {
-    buildLast7DaySlots,
-    getWeeklyOverview,
-    mergeWeeklyIntoSlots,
-    parseWeeklyOverviewPayload,
-} from '../api/food'
+import { getImpactMetrics } from '../api/community'
 import type {
     BodyDataRequest,
-    DailyCalorieBarDto,
     ImpactMetricsResponse,
     UserProfileDto,
     UserChallengeDto,
@@ -27,13 +20,11 @@ import {
 } from '../api/user'
 import { mergeUserProfileDto, useAuth, type UserProfile } from '../context/AuthContext'
 import {
-    buildAchievementHighlights,
     DEFAULT_PROFILE_AVATAR_URL,
     formatMemberSince,
     getDisplayName,
     getGoals,
     getSettingsEntries,
-    weekData,
 } from './profile/data'
 import { ProfileModals } from './profile/ProfileModals'
 import { ProfileOverview } from './profile/ProfileOverview'
@@ -43,25 +34,11 @@ import type {
     NotificationPreferences,
     PrivacyPreferences,
     SettingsTitle,
-    WeeklyEntry,
 } from './profile/types'
 
 type SaveActionResult = {
     message?: string
     success: boolean
-}
-
-const WEEKDAY_SHORT_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
-
-function toWeeklyEntries(bars: DailyCalorieBarDto[]): WeeklyEntry[] {
-    return bars.map((bar) => {
-        const [y, m, d] = bar.date.split('-').map(Number)
-        const dt = new Date(y, (m || 1) - 1, d || 1)
-        return {
-            calories: Math.round(Number(bar.totalCalories) || 0),
-            day: WEEKDAY_SHORT_EN[dt.getDay()] ?? bar.date.slice(5),
-        }
-    })
 }
 
 export function ProfileScreen() {
@@ -78,7 +55,6 @@ export function ProfileScreen() {
             analyticsSharing: true,
             profileVisibility: false,
         })
-    const [selectedDay, setSelectedDay] = useState<WeeklyEntry>(weekData[5])
     const [selectedSetting, setSelectedSetting] = useState<SettingsTitle | null>(null)
     const [showSettings, setShowSettings] = useState(false)
     const [showSubscription, setShowSubscription] = useState(false)
@@ -88,27 +64,14 @@ export function ProfileScreen() {
         null
     )
     const [profileStats, setProfileStats] = useState<UserStatsDto | null>(null)
-    const [weeklyBars, setWeeklyBars] = useState<DailyCalorieBarDto[]>(
-        buildLast7DaySlots(new Date())
-    )
     const [allChallenges, setAllChallenges] = useState<UserChallengeDto[]>([])
     const [activeChallenges, setActiveChallenges] = useState<UserChallengeDto[]>([])
-    const [myTopics, setMyTopics] = useState<string[]>([])
 
     const palette = useMemo(() => getProfilePalette(theme), [theme])
-    const weeklyEntries = useMemo(() => toWeeklyEntries(weeklyBars), [weeklyBars])
     const displayName = getDisplayName(userProfile?.nickname, userEmail)
     const goals = getGoals(userProfile)
     const settingsEntries = getSettingsEntries(userProfile)
-    const achievementHighlights = buildAchievementHighlights(profileStats)
     const avatarUrl = userProfile?.avatarUrl ?? DEFAULT_PROFILE_AVATAR_URL
-    const averageCalories =
-        weeklyEntries.length > 0
-            ? Math.round(
-                  weeklyEntries.reduce((sum, item) => sum + item.calories, 0) /
-                      weeklyEntries.length
-              )
-            : 0
     const bodyMassIndex =
         userProfile?.height && userProfile?.weight
             ? userProfile.weight / (userProfile.height / 100) ** 2
@@ -160,17 +123,6 @@ export function ProfileScreen() {
         }
     }, [activeChallenges, allChallenges])
 
-    useEffect(() => {
-        if (weeklyEntries.length === 0) {
-            return
-        }
-
-        setSelectedDay((current) => {
-            const existing = weeklyEntries.find((item) => item.day === current.day)
-            return existing ?? weeklyEntries[weeklyEntries.length - 1]
-        })
-    }, [weeklyEntries])
-
     const loadProfileData = useCallback(async () => {
         setDashboardLoading(true)
         setDashboardNotice(null)
@@ -178,17 +130,13 @@ export function ProfileScreen() {
         const [
             impactMetricsRes,
             statsRes,
-            weeklyRes,
             myChallengesRes,
             activeChallengesRes,
-            myTopicsRes,
         ] = await Promise.allSettled([
             getImpactMetrics(),
             getMyStats(),
-            getWeeklyOverview(authUserId ?? ''),
             getMyChallenges(),
             getMyActiveChallenges(),
-            getMyTopics(),
         ])
 
         let failedRequests = 0
@@ -212,17 +160,6 @@ export function ProfileScreen() {
             failedRequests += 1
         }
 
-        if (weeklyRes.status === 'fulfilled') {
-            succeededRequests += 1
-            const parsed = parseWeeklyOverviewPayload(weeklyRes.value.data)
-            const merged = mergeWeeklyIntoSlots(buildLast7DaySlots(new Date()), parsed)
-            if (merged.length > 0) {
-                setWeeklyBars(merged)
-            }
-        } else {
-            failedRequests += 1
-        }
-
         if (myChallengesRes.status === 'fulfilled') {
             succeededRequests += 1
             if (Array.isArray(myChallengesRes.value?.data)) {
@@ -241,15 +178,6 @@ export function ProfileScreen() {
             failedRequests += 1
         }
 
-        if (myTopicsRes.status === 'fulfilled') {
-            succeededRequests += 1
-            if (Array.isArray(myTopicsRes.value?.data)) {
-                setMyTopics(myTopicsRes.value.data)
-            }
-        } else {
-            failedRequests += 1
-        }
-
         if (succeededRequests === 0) {
             setDashboardNotice(
                 'Profile data is temporarily unavailable. Check the backend and try again.'
@@ -261,7 +189,7 @@ export function ProfileScreen() {
         }
 
         setDashboardLoading(false)
-    }, [authUserId])
+    }, [])
 
     useFocusEffect(
         useCallback(() => {
@@ -382,9 +310,7 @@ export function ProfileScreen() {
             edges={['left', 'right']}
         >
             <ProfileOverview
-                achievements={achievementHighlights}
                 avatarUrl={avatarUrl}
-                averageCalories={averageCalories}
                 dashboardLoading={dashboardLoading}
                 dashboardNotice={dashboardNotice}
                 displayName={displayName}
@@ -394,16 +320,12 @@ export function ProfileScreen() {
                 onOpenSettings={() => setShowSettings(true)}
                 palette={palette}
                 challengeSummary={challengeSummary}
-                myTopics={myTopics}
-                selectedDay={selectedDay}
-                setSelectedDay={setSelectedDay}
                 stats={profileStats}
                 themeColors={{
                     onSurfaceVariant: theme.colors.onSurfaceVariant,
                     primary: theme.colors.primary,
                 }}
                 userEmail={userEmail}
-                weekData={weeklyEntries}
             />
 
             <ProfileModals

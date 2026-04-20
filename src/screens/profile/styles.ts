@@ -6,13 +6,11 @@ export function getProfilePalette(theme: Theme) {
         accentSurface: '#E8F0E7',
         activeBar: '#8BA888',
         bannerSurface: '#8BA888',
-        chartTrack: '#EDF3EC',
         dangerText: '#D14343',
         detailAccent: '#F1F6F0',
         detailBorder: 'rgba(139, 168, 136, 0.18)',
         detailHighlight: '#7C9A79',
         detailStrongSurface: '#E1ECDF',
-        inactiveBar: '#C7D9C4',
         mutedText: theme.colors.onSurfaceVariant,
         page: '#E8F0E7',
         premiumBadge: '#D1A52E',
@@ -306,6 +304,15 @@ export const styles = StyleSheet.create({
     },
     goalList: {
         gap: 16,
+    },
+    mallAdBanner: {
+        aspectRatio: 2.25,
+        width: '100%',
+    },
+    mallAdImageWrap: {
+        borderRadius: 16,
+        borderWidth: 1,
+        overflow: 'hidden',
     },
     metricCard: {
         borderRadius: 20,
