@@ -56,6 +56,20 @@ export const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
     },
+    avatarActionList: {
+        flex: 1,
+        gap: 10,
+    },
+    avatarEditorImage: {
+        borderRadius: 44,
+        height: 88,
+        width: 88,
+    },
+    avatarEditorRow: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 14,
+    },
     averageText: {
         fontSize: 14,
         textAlign: 'center',
@@ -67,6 +81,11 @@ export const styles = StyleSheet.create({
         borderRadius: 24,
         gap: 18,
         padding: 20,
+    },
+    bannerMeta: {
+        color: 'rgba(255,255,255,0.88)',
+        fontSize: 12,
+        lineHeight: 18,
     },
     bannerStatBlock: {
         flex: 1,
@@ -92,6 +111,71 @@ export const styles = StyleSheet.create({
         fontWeight: '600',
     },
     bannerTitleRow: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    challengeBadge: {
+        fontSize: 18,
+    },
+    challengeHighlightCard: {
+        alignItems: 'center',
+        borderRadius: 18,
+        borderWidth: 1,
+        flexDirection: 'row',
+        gap: 12,
+        padding: 14,
+    },
+    challengeHighlightCopy: {
+        flex: 1,
+        gap: 4,
+    },
+    challengeHighlightList: {
+        gap: 12,
+    },
+    challengeMeta: {
+        fontSize: 12,
+        lineHeight: 18,
+    },
+    challengeProgressBar: {
+        width: 76,
+    },
+    challengeProgressBlock: {
+        alignItems: 'flex-end',
+        gap: 8,
+    },
+    challengeProgressValue: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    challengeStatCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        flex: 1,
+        gap: 4,
+        padding: 12,
+    },
+    challengeStatLabel: {
+        fontSize: 12,
+    },
+    challengeStatValue: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    challengeStatsRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    challengeStatus: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    challengeTitle: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    challengeTitleRow: {
         alignItems: 'center',
         flexDirection: 'row',
         gap: 8,
@@ -190,6 +274,20 @@ export const styles = StyleSheet.create({
     },
     divider: {
         marginVertical: 12,
+    },
+    emptyPanel: {
+        borderRadius: 18,
+        borderWidth: 1,
+        gap: 6,
+        padding: 14,
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        lineHeight: 19,
+    },
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
     },
     goalBlock: {
         gap: 8,
@@ -321,6 +419,10 @@ export const styles = StyleSheet.create({
         borderRadius: 999,
         height: 8,
     },
+    sectionCaption: {
+        fontSize: 13,
+        lineHeight: 19,
+    },
     sectionCard: {
         borderRadius: 24,
     },
@@ -445,5 +547,62 @@ export const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         textAlign: 'center',
+    },
+    topicChip: {
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    topicChipList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    topicChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    wellnessCard: {
+        borderRadius: 18,
+        borderWidth: 1,
+        flex: 1,
+        gap: 12,
+        minWidth: '48%',
+        padding: 14,
+    },
+    wellnessGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    wellnessHeader: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+    },
+    wellnessIcon: {
+        alignItems: 'center',
+        borderRadius: 16,
+        height: 40,
+        justifyContent: 'center',
+        width: 40,
+    },
+    wellnessLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    wellnessMeta: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    wellnessSubtitle: {
+        fontSize: 12,
+        lineHeight: 18,
+        minHeight: 36,
+    },
+    wellnessValue: {
+        fontSize: 24,
+        fontWeight: '700',
     },
 })

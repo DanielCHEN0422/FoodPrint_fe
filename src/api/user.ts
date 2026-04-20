@@ -4,6 +4,7 @@ import type {
     BodyDataRequest,
     UpdateProfileRequest,
     UserProfileDto,
+    UserStatsDto,
 } from './types'
 
 const BASE = 'api/users'
@@ -25,4 +26,9 @@ export async function updateBodyData(
     body: BodyDataRequest
 ): Promise<ApiResponse<UserProfileDto>> {
     return apiPut<UserProfileDto>(`${BASE}/me/body-data`, body)
+}
+
+/** GET /api/users/me/stats - 获取当前用户的基础统计 */
+export async function getMyStats(): Promise<ApiResponse<UserStatsDto>> {
+    return apiGet<UserStatsDto>(`${BASE}/me/stats`)
 }

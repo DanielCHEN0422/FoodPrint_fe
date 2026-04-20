@@ -42,3 +42,21 @@ export type PrivacyPreferences = {
     analyticsSharing: boolean
     profileVisibility: boolean
 }
+
+export type ChallengeHighlight = {
+    badgeIcon: string
+    daysRemaining: number
+    id: string
+    progressPercent: number
+    statusLabel: string
+    streakLabel: string
+    title: string
+    todayCheckedIn: boolean
+}
+
+export type ChallengeSummary = {
+    activeCount: number
+    completedCount: number
+    highlights: ChallengeHighlight[]
+    longestStreak: number
+}

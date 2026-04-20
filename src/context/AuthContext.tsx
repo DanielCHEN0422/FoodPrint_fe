@@ -36,10 +36,13 @@ type AuthContextValue = {
 }
 
 export type UserProfile = {
+    avatarUrl?: string | null
+    createdAt?: string
     email: string
     goal: 'lose' | 'maintain' | 'gain'
     gender: 'male' | 'female' | 'other'
     height: number
+    nickname?: string
     weight: number
     age: number
     activityLevel: 'low' | 'medium' | 'high'
@@ -51,6 +54,81 @@ const AUTH_SESSION_KEY = '@foodprint/auth_session'
 const AUTH_PROFILE_KEY = '@foodprint/auth_profile'
 const AUTH_ONBOARDING_KEY = '@foodprint/auth_onboarding_completed'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function getGender(
+    value: string | null | undefined,
+    fallback: UserProfile['gender']
+): UserProfile['gender'] {
+    return value === 'male' || value === 'female' || value === 'other'
+        ? value
+        : fallback
+}
+
+function getGoal(
+    value: string | null | undefined,
+    fallback: UserProfile['goal']
+): UserProfile['goal'] {
+    return value === 'lose' || value === 'maintain' || value === 'gain'
+        ? value
+        : fallback
+}
+
+function getPositiveNumber(
+    value: number | null | undefined,
+    fallback: number
+): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+        ? value
+        : fallback
+}
+
+function getOptionalText(
+    value: string | null | undefined,
+    fallback: string
+): string {
+    return typeof value === 'string' && value.trim().length > 0
+        ? value.trim()
+        : fallback
+}
+
+function getOptionalNullableText(
+    value: string | null | undefined,
+    fallback: string | null
+): string | null {
+    return typeof value === 'string' && value.trim().length > 0
+        ? value.trim()
+        : fallback
+}
+
+export function mergeUserProfileDto(
+    dto: UserProfileDto,
+    fallbackEmail: string,
+    existingProfile: UserProfile | null = null
+): UserProfile {
+    return {
+        activityLevel: existingProfile?.activityLevel ?? 'medium',
+        age: getPositiveNumber(dto.age, existingProfile?.age ?? 0),
+        avatarUrl: getOptionalNullableText(
+            dto.avatarUrl,
+            existingProfile?.avatarUrl ?? null
+        ),
+        createdAt: dto.createdAt ?? existingProfile?.createdAt,
+        dailyCalories: getPositiveNumber(
+            dto.dailyCalorieTarget,
+            existingProfile?.dailyCalories ?? 2000
+        ),
+        dietPreference: getOptionalText(
+            dto.dietaryPreference,
+            existingProfile?.dietPreference ?? 'none'
+        ),
+        email: getOptionalText(dto.email, existingProfile?.email ?? fallbackEmail),
+        gender: getGender(dto.gender, existingProfile?.gender ?? 'other'),
+        goal: getGoal(dto.goal, existingProfile?.goal ?? 'maintain'),
+        height: getPositiveNumber(dto.heightCm, existingProfile?.height ?? 0),
+        nickname: getOptionalText(dto.nickname, existingProfile?.nickname ?? ''),
+        weight: getPositiveNumber(dto.weightKg, existingProfile?.weight ?? 0),
+    }
+}
 
 type PasswordStrength = {
     minLength: boolean
@@ -99,6 +177,44 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
 
+    const initializeUserProfile = useCallback(
+        async (
+            fallbackEmail: string,
+            existingProfile: UserProfile | null = null
+        ): Promise<UserProfile | null> => {
+            try {
+                const res = await getMe()
+                const dto = res?.data ?? (res as unknown as UserProfileDto)
+                if (dto && typeof dto === 'object' && ('id' in dto || 'email' in dto)) {
+                    const mergedProfile = mergeUserProfileDto(
+                        dto as UserProfileDto,
+                        fallbackEmail,
+                        existingProfile
+                    )
+                    setUserProfile(mergedProfile)
+                    try {
+                        await AsyncStorage.setItem(
+                            AUTH_PROFILE_KEY,
+                            JSON.stringify(mergedProfile)
+                        )
+                    } catch {
+                        // profile 持久化失败不阻塞会话初始化
+                    }
+                    return mergedProfile
+                }
+            } catch {
+                // 接口失败时保持本地兜底资料
+            }
+
+            if (existingProfile) {
+                setUserProfile(existingProfile)
+            }
+
+            return existingProfile
+        },
+        []
+    )
+
     useEffect(() => {
         async function restoreSession() {
             try {
@@ -116,35 +232,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
                     AsyncStorage.getItem(AUTH_PROFILE_KEY),
                 ])
 
+                const storedProfile = profileRaw
+                    ? (JSON.parse(profileRaw) as UserProfile)
+                    : null
+
                 if (session?.user?.email) {
-                    try {
-                        const res = await getMe()
-                        const d = res?.data ?? (res as unknown as UserProfileDto)
-                        if (d && typeof d === 'object' && ('id' in d || 'email' in d)) {
-                            const u = d as UserProfileDto
-                            setUserProfile({
-                                activityLevel: 'medium',
-                                age: u.age ?? 0,
-                                dailyCalories: u.dailyCalorieTarget ?? 2000,
-                                dietPreference: 'none',
-                                email: u.email ?? session.user.email ?? '',
-                                gender:
-                                    (u.gender as UserProfile['gender']) ?? 'other',
-                                goal:
-                                    (u.goal as UserProfile['goal']) ?? 'maintain',
-                                height: u.heightCm ?? 0,
-                                weight: u.weightKg ?? 0,
-                            })
-                        } else if (profileRaw) {
-                            setUserProfile(JSON.parse(profileRaw) as UserProfile)
-                        }
-                    } catch {
-                        if (profileRaw) {
-                            setUserProfile(JSON.parse(profileRaw) as UserProfile)
-                        }
-                    }
-                } else if (profileRaw) {
-                    setUserProfile(JSON.parse(profileRaw) as UserProfile)
+                    await initializeUserProfile(session.user.email, storedProfile)
+                } else if (storedProfile) {
+                    setUserProfile(storedProfile)
                 }
 
                 if (onboardingRaw === 'false') {
@@ -177,12 +272,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 setIsPasswordRecovery(false)
             } else if (event === 'SIGNED_IN') {
                 setIsPasswordRecovery(false)
+                if (session?.user?.email) {
+                    void initializeUserProfile(session.user.email)
+                }
             }
         })
         return () => {
             subscription.unsubscribe()
         }
-    }, [])
+    }, [initializeUserProfile])
 
     const login = useCallback(
         async (email: string, password: string): Promise<AuthActionResult> => {
@@ -203,9 +301,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
             setIsPasswordRecovery(false)
             setHasCompletedOnboarding(true)
             await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'true')
+            if (data.user?.email) {
+                await initializeUserProfile(data.user.email)
+            }
             return { success: true }
         },
-        []
+        [initializeUserProfile]
     )
 
     const register = useCallback(
@@ -235,9 +336,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
             setHasCompletedOnboarding(false)
             setUserProfile(null)
             await AsyncStorage.setItem(AUTH_ONBOARDING_KEY, 'false')
+            await initializeUserProfile(sessionEmail)
             return { success: true }
         },
-        []
+        [initializeUserProfile]
     )
 
     const logout = useCallback(async () => {

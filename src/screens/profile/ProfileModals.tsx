@@ -1,19 +1,26 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import { Alert, ScrollView, View } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { useEffect, useState } from 'react'
+import { Alert, Image, ScrollView, View } from 'react-native'
 import {
     Button,
     Card,
     Divider,
+    HelperText,
     IconButton,
     Modal,
     Portal,
     ProgressBar,
+    SegmentedButtons,
     Switch,
     Text,
+    TextInput,
 } from 'react-native-paper'
 
+import type { BodyDataRequest } from '../../api/types'
 import type { UserProfile } from '../../context/AuthContext'
-import { formatActivityLevel, formatGoal } from './data'
+import { uploadAvatarAsset } from '../../lib/avatarUpload'
+import { formatActivityLevel, formatDietaryPreference, formatGoal } from './data'
 import { styles } from './styles'
 import type {
     GoalEntry,
@@ -28,11 +35,23 @@ type ThemeColors = {
     primary: string
 }
 
+type SaveActionResult = {
+    message?: string
+    success: boolean
+}
+
 type DetailContentProps = {
+    authUserId: string | null
     bodyMassIndex: number | null
     displayName: string
     goals: GoalEntry[]
+    memberSinceLabel: string
     notificationPreferences: NotificationPreferences
+    onSaveBodyData: (values: BodyDataRequest) => Promise<SaveActionResult>
+    onSavePersonalInfo: (values: {
+        avatarUrl: string
+        nickname: string
+    }) => Promise<SaveActionResult>
     onToggleNotification: (
         key: keyof NotificationPreferences,
         value: boolean
@@ -60,11 +79,22 @@ type ProfileModalsProps = DetailContentProps & {
     themeColors: ThemeColors
 }
 
+const AVATAR_PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
+    allowsEditing: true,
+    aspect: [1, 1],
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.9,
+}
+
 function DetailContent({
+    authUserId,
     bodyMassIndex,
     displayName,
     goals,
+    memberSinceLabel,
     notificationPreferences,
+    onSaveBodyData,
+    onSavePersonalInfo,
     onToggleNotification,
     onTogglePrivacy,
     palette,
@@ -73,8 +103,198 @@ function DetailContent({
     userEmail,
     userProfile,
 }: DetailContentProps) {
+    const [nickname, setNickname] = useState(userProfile?.nickname ?? '')
+    const [avatarUrl, setAvatarUrl] = useState(userProfile?.avatarUrl ?? '')
+    const [height, setHeight] = useState(
+        userProfile?.height ? String(userProfile.height) : ''
+    )
+    const [weight, setWeight] = useState(
+        userProfile?.weight ? String(userProfile.weight) : ''
+    )
+    const [age, setAge] = useState(userProfile?.age ? String(userProfile.age) : '')
+    const [gender, setGender] = useState<UserProfile['gender']>(
+        userProfile?.gender ?? 'other'
+    )
+    const [goal, setGoal] = useState<UserProfile['goal']>(
+        userProfile?.goal ?? 'maintain'
+    )
+    const [dailyCalories, setDailyCalories] = useState(
+        userProfile?.dailyCalories ? String(userProfile.dailyCalories) : ''
+    )
+    const [dietPreference, setDietPreference] = useState(
+        userProfile?.dietPreference ?? ''
+    )
+    const [formError, setFormError] = useState('')
+    const [savingSection, setSavingSection] = useState<
+        'body' | 'goals' | 'personal' | null
+    >(null)
+
+    useEffect(() => {
+        setNickname(userProfile?.nickname ?? '')
+        setAvatarUrl(userProfile?.avatarUrl ?? '')
+        setHeight(userProfile?.height ? String(userProfile.height) : '')
+        setWeight(userProfile?.weight ? String(userProfile.weight) : '')
+        setAge(userProfile?.age ? String(userProfile.age) : '')
+        setGender(userProfile?.gender ?? 'other')
+        setGoal(userProfile?.goal ?? 'maintain')
+        setDailyCalories(
+            userProfile?.dailyCalories ? String(userProfile.dailyCalories) : ''
+        )
+        setDietPreference(userProfile?.dietPreference ?? '')
+        setFormError('')
+        setSavingSection(null)
+    }, [selectedSetting, userProfile])
+
     if (!selectedSetting) {
         return null
+    }
+
+    const persistPersonalInfo = async (
+        nextNickname: string,
+        nextAvatarUrl: string,
+        successMessage = 'Personal information updated.'
+    ) => {
+        setFormError('')
+        setSavingSection('personal')
+        const result = await onSavePersonalInfo({
+            avatarUrl: nextAvatarUrl,
+            nickname: nextNickname,
+        })
+        setSavingSection(null)
+
+        if (!result.success) {
+            setFormError(result.message ?? 'Failed to update personal information.')
+            return
+        }
+
+        Alert.alert('Profile', result.message ?? successMessage)
+    }
+
+    const handleSavePersonalInfo = async () => {
+        await persistPersonalInfo(nickname.trim(), avatarUrl.trim())
+    }
+
+    const savePickedAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
+        if (!authUserId) {
+            setFormError('Please sign in before uploading an avatar.')
+            return
+        }
+
+        setFormError('')
+        setSavingSection('personal')
+
+        try {
+            const uploadedAvatarUrl = await uploadAvatarAsset(authUserId, asset)
+            setAvatarUrl(uploadedAvatarUrl)
+            const result = await onSavePersonalInfo({
+                avatarUrl: uploadedAvatarUrl,
+                nickname: nickname.trim(),
+            })
+
+            if (!result.success) {
+                setFormError(result.message ?? 'Failed to update avatar.')
+                return
+            }
+
+            Alert.alert('Profile', result.message ?? 'Avatar updated.')
+        } catch (error) {
+            setFormError(
+                error instanceof Error ? error.message : 'Failed to upload avatar.'
+            )
+        } finally {
+            setSavingSection(null)
+        }
+    }
+
+    const handlePickAvatarFromLibrary = async () => {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+        if (!permission.granted) {
+            setFormError('Photo library permission is required to choose an avatar.')
+            return
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync(AVATAR_PICK_OPTIONS)
+
+        if (!result.canceled && result.assets?.[0]) {
+            await savePickedAvatar(result.assets[0])
+        }
+    }
+
+    const handleTakeAvatarPhoto = async () => {
+        const permission = await ImagePicker.requestCameraPermissionsAsync()
+
+        if (!permission.granted) {
+            setFormError('Camera permission is required to take an avatar photo.')
+            return
+        }
+
+        const result = await ImagePicker.launchCameraAsync(AVATAR_PICK_OPTIONS)
+
+        if (!result.canceled && result.assets?.[0]) {
+            await savePickedAvatar(result.assets[0])
+        }
+    }
+
+    const handleSaveBodyMetrics = async () => {
+        const nextHeight = Number(height)
+        const nextWeight = Number(weight)
+        const nextAge = Number(age)
+
+        if (
+            !Number.isFinite(nextHeight) ||
+            !Number.isFinite(nextWeight) ||
+            !Number.isFinite(nextAge) ||
+            nextHeight <= 0 ||
+            nextWeight <= 0 ||
+            nextAge <= 0
+        ) {
+            setFormError('Enter valid positive numbers for height, weight, and age.')
+            return
+        }
+
+        setFormError('')
+        setSavingSection('body')
+        const result = await onSaveBodyData({
+            age: nextAge,
+            gender,
+            heightCm: nextHeight,
+            weightKg: nextWeight,
+        })
+        setSavingSection(null)
+
+        if (!result.success) {
+            setFormError(result.message ?? 'Failed to update body metrics.')
+            return
+        }
+
+        Alert.alert('Profile', result.message ?? 'Body metrics updated.')
+    }
+
+    const handleSaveHealthGoals = async () => {
+        const nextDailyCalories = Number(dailyCalories)
+        const nextDietPreference = dietPreference.trim()
+
+        if (!Number.isFinite(nextDailyCalories) || nextDailyCalories <= 0) {
+            setFormError('Enter a valid positive calorie target.')
+            return
+        }
+
+        setFormError('')
+        setSavingSection('goals')
+        const result = await onSaveBodyData({
+            dailyCalorieTarget: nextDailyCalories,
+            dietaryPreference: nextDietPreference || 'none',
+            goal,
+        })
+        setSavingSection(null)
+
+        if (!result.success) {
+            setFormError(result.message ?? 'Failed to update health goals.')
+            return
+        }
+
+        Alert.alert('Profile', result.message ?? 'Health goals updated.')
     }
 
     if (selectedSetting === 'Personal Information') {
@@ -93,12 +313,14 @@ function DetailContent({
                     <Card.Content style={styles.sectionContent}>
                         <Text style={styles.sectionTitle}>Profile Identity</Text>
                         {[
-                            { label: 'Full name', value: displayName },
+                            { label: 'Display name', value: displayName },
                             { label: 'Email', value: userEmail ?? 'Not added yet' },
-                            { label: 'Contact', value: 'Add a phone number' },
+                            { label: 'Member since', value: memberSinceLabel },
                             {
                                 label: 'Diet preference',
-                                value: userProfile?.dietPreference ?? 'Balanced plan',
+                                value: formatDietaryPreference(
+                                    userProfile?.dietPreference
+                                ),
                             },
                         ].map((item) => (
                             <View key={item.label} style={styles.detailRow}>
@@ -111,17 +333,93 @@ function DetailContent({
                     </Card.Content>
                 </Card>
 
-                <Button
-                    mode="contained"
-                    onPress={() =>
-                        Alert.alert(
-                            'Profile',
-                            'Profile editing can be connected here next.'
-                        )
-                    }
+                <Card
+                    style={[
+                        styles.detailInfoCard,
+                        styles.detailCardFrame,
+                        {
+                            backgroundColor: palette.detailStrongSurface,
+                            borderColor: palette.detailBorder,
+                        },
+                    ]}
                 >
-                    <Text>Edit personal information</Text>
-                </Button>
+                    <Card.Content style={styles.sectionContent}>
+                        <Text style={styles.sectionTitle}>Edit personal information</Text>
+                        {!!avatarUrl && (
+                            <View style={styles.avatarEditorRow}>
+                                <Image
+                                    source={{ uri: avatarUrl }}
+                                    style={styles.avatarEditorImage}
+                                />
+                                <View style={styles.avatarActionList}>
+                                    <Button
+                                        disabled={savingSection === 'personal'}
+                                        icon="image-outline"
+                                        mode="outlined"
+                                        onPress={() => {
+                                            void handlePickAvatarFromLibrary()
+                                        }}
+                                    >
+                                        <Text>Choose photo</Text>
+                                    </Button>
+                                    <Button
+                                        disabled={savingSection === 'personal'}
+                                        icon="camera-outline"
+                                        mode="outlined"
+                                        onPress={() => {
+                                            void handleTakeAvatarPhoto()
+                                        }}
+                                    >
+                                        <Text>Take photo</Text>
+                                    </Button>
+                                </View>
+                            </View>
+                        )}
+                        {!avatarUrl && (
+                            <View style={styles.avatarActionList}>
+                                <Button
+                                    disabled={savingSection === 'personal'}
+                                    icon="image-outline"
+                                    mode="outlined"
+                                    onPress={() => {
+                                        void handlePickAvatarFromLibrary()
+                                    }}
+                                >
+                                    <Text>Choose avatar</Text>
+                                </Button>
+                                <Button
+                                    disabled={savingSection === 'personal'}
+                                    icon="camera-outline"
+                                    mode="outlined"
+                                    onPress={() => {
+                                        void handleTakeAvatarPhoto()
+                                    }}
+                                >
+                                    <Text>Take photo</Text>
+                                </Button>
+                            </View>
+                        )}
+                        <TextInput
+                            autoCapitalize="words"
+                            label="Nickname"
+                            mode="outlined"
+                            onChangeText={setNickname}
+                            value={nickname}
+                        />
+                        <HelperText type="error" visible={!!formError}>
+                            {formError || ' '}
+                        </HelperText>
+                        <Button
+                            loading={savingSection === 'personal'}
+                            mode="contained"
+                            onPress={() => {
+                                void handleSavePersonalInfo()
+                            }}
+                        >
+                            <Text>Save personal information</Text>
+                        </Button>
+                    </Card.Content>
+                </Card>
             </View>
         )
     }
@@ -131,12 +429,30 @@ function DetailContent({
             <View style={styles.detailBody}>
                 <View style={styles.metricGrid}>
                     {[
-                        { label: 'Weight', value: `${userProfile?.weight ?? 75} kg` },
-                        { label: 'Height', value: `${userProfile?.height ?? 175} cm` },
-                        { label: 'Age', value: `${userProfile?.age ?? 27}` },
+                        {
+                            label: 'Weight',
+                            value:
+                                userProfile && userProfile.weight > 0
+                                    ? `${userProfile.weight} kg`
+                                    : 'Not set',
+                        },
+                        {
+                            label: 'Height',
+                            value:
+                                userProfile && userProfile.height > 0
+                                    ? `${userProfile.height} cm`
+                                    : 'Not set',
+                        },
+                        {
+                            label: 'Age',
+                            value:
+                                userProfile && userProfile.age > 0
+                                    ? `${userProfile.age}`
+                                    : 'Not set',
+                        },
                         {
                             label: 'BMI',
-                            value: bodyMassIndex ? bodyMassIndex.toFixed(1) : '24.5',
+                            value: bodyMassIndex ? bodyMassIndex.toFixed(1) : 'Not set',
                         },
                     ].map((item) => (
                         <Card
@@ -189,12 +505,72 @@ function DetailContent({
                         </View>
                         <View style={styles.detailRow}>
                             <Text style={[styles.detailLabel, { color: palette.mutedText }]}>
-                                Body focus
+                                Gender
                             </Text>
                             <Text style={styles.detailValue}>
-                                Lean and sustainable progress
+                                {gender[0]?.toUpperCase() + gender.slice(1)}
                             </Text>
                         </View>
+                    </Card.Content>
+                </Card>
+
+                <Card
+                    style={[
+                        styles.detailInfoCard,
+                        styles.detailCardFrame,
+                        {
+                            backgroundColor: palette.detailStrongSurface,
+                            borderColor: palette.detailBorder,
+                        },
+                    ]}
+                >
+                    <Card.Content style={styles.sectionContent}>
+                        <Text style={styles.sectionTitle}>Update body metrics</Text>
+                        <TextInput
+                            keyboardType="numeric"
+                            label="Height (cm)"
+                            mode="outlined"
+                            onChangeText={setHeight}
+                            value={height}
+                        />
+                        <TextInput
+                            keyboardType="numeric"
+                            label="Weight (kg)"
+                            mode="outlined"
+                            onChangeText={setWeight}
+                            value={weight}
+                        />
+                        <TextInput
+                            keyboardType="numeric"
+                            label="Age"
+                            mode="outlined"
+                            onChangeText={setAge}
+                            value={age}
+                        />
+                        <Text style={styles.settingsTitle}>Gender</Text>
+                        <SegmentedButtons
+                            buttons={[
+                                { label: 'Male', value: 'male' },
+                                { label: 'Female', value: 'female' },
+                                { label: 'Other', value: 'other' },
+                            ]}
+                            onValueChange={(value) =>
+                                setGender(value as UserProfile['gender'])
+                            }
+                            value={gender}
+                        />
+                        <HelperText type="error" visible={!!formError}>
+                            {formError || ' '}
+                        </HelperText>
+                        <Button
+                            loading={savingSection === 'body'}
+                            mode="contained"
+                            onPress={() => {
+                                void handleSaveBodyMetrics()
+                            }}
+                        >
+                            <Text>Save body metrics</Text>
+                        </Button>
                     </Card.Content>
                 </Card>
             </View>
@@ -229,7 +605,10 @@ function DetailContent({
                                     Math.round((userProfile?.weight ?? 75) * 2)
                                 )} g`,
                             },
-                            { label: 'Hydration', value: '8 glasses daily' },
+                            {
+                                label: 'Diet preference',
+                                value: formatDietaryPreference(userProfile?.dietPreference),
+                            },
                         ].map((item) => (
                             <View key={item.label} style={styles.detailRow}>
                                 <Text style={[styles.detailLabel, { color: palette.mutedText }]}>
@@ -252,22 +631,22 @@ function DetailContent({
                     ]}
                 >
                     <Card.Content style={styles.goalList}>
-                        {goals.map((goal) => (
-                            <View key={goal.label} style={styles.goalBlock}>
+                        {goals.map((goalItem) => (
+                            <View key={goalItem.label} style={styles.goalBlock}>
                                 <View style={styles.goalHeader}>
-                                    <Text style={styles.goalLabel}>{goal.label}</Text>
+                                    <Text style={styles.goalLabel}>{goalItem.label}</Text>
                                     <Text
                                         style={[
                                             styles.goalCurrent,
                                             { color: palette.detailHighlight },
                                         ]}
                                     >
-                                        {goal.current}
+                                        {goalItem.current}
                                     </Text>
                                 </View>
                                 <ProgressBar
                                     color={palette.activeBar}
-                                    progress={goal.progress}
+                                    progress={goalItem.progress}
                                     style={[
                                         styles.progressBar,
                                         { backgroundColor: palette.progressTrack },
@@ -275,6 +654,60 @@ function DetailContent({
                                 />
                             </View>
                         ))}
+                    </Card.Content>
+                </Card>
+
+                <Card
+                    style={[
+                        styles.detailInfoCard,
+                        styles.detailCardFrame,
+                        {
+                            backgroundColor: palette.detailStrongSurface,
+                            borderColor: palette.detailBorder,
+                        },
+                    ]}
+                >
+                    <Card.Content style={styles.sectionContent}>
+                        <Text style={styles.sectionTitle}>Update health goals</Text>
+                        <Text style={styles.settingsTitle}>Goal</Text>
+                        <SegmentedButtons
+                            buttons={[
+                                { label: 'Lose', value: 'lose' },
+                                { label: 'Maintain', value: 'maintain' },
+                                { label: 'Gain', value: 'gain' },
+                            ]}
+                            onValueChange={(value) =>
+                                setGoal(value as UserProfile['goal'])
+                            }
+                            value={goal}
+                        />
+                        <TextInput
+                            keyboardType="numeric"
+                            label="Daily calorie target"
+                            mode="outlined"
+                            onChangeText={setDailyCalories}
+                            value={dailyCalories}
+                        />
+                        <TextInput
+                            autoCapitalize="words"
+                            label="Dietary preference"
+                            mode="outlined"
+                            onChangeText={setDietPreference}
+                            placeholder="e.g. Vegetarian"
+                            value={dietPreference}
+                        />
+                        <HelperText type="error" visible={!!formError}>
+                            {formError || ' '}
+                        </HelperText>
+                        <Button
+                            loading={savingSection === 'goals'}
+                            mode="contained"
+                            onPress={() => {
+                                void handleSaveHealthGoals()
+                            }}
+                        >
+                            <Text>Save health goals</Text>
+                        </Button>
                     </Card.Content>
                 </Card>
             </View>
@@ -295,7 +728,7 @@ function DetailContent({
                     ]}
                 >
                     <Card.Content style={styles.sectionContent}>
-                        {[
+                        {[ 
                             {
                                 description:
                                     'Get reminded before your preferred meal logging time.',
@@ -347,6 +780,7 @@ function DetailContent({
                         ))}
                     </Card.Content>
                 </Card>
+
             </View>
         )
     }
@@ -365,7 +799,7 @@ function DetailContent({
                     ]}
                 >
                     <Card.Content style={styles.sectionContent}>
-                        {[
+                        {[ 
                             {
                                 description:
                                     'Allow other community members to see your public progress.',
@@ -412,30 +846,6 @@ function DetailContent({
                     </Card.Content>
                 </Card>
 
-                <View style={styles.securityActions}>
-                    <Button
-                        mode="outlined"
-                        onPress={() =>
-                            Alert.alert(
-                                'Privacy',
-                                'Export request can be connected here next.'
-                            )
-                        }
-                    >
-                        <Text>Export my data</Text>
-                    </Button>
-                    <Button
-                        mode="outlined"
-                        onPress={() =>
-                            Alert.alert(
-                                'Security',
-                                'Permission review can be connected here next.'
-                            )
-                        }
-                    >
-                        <Text>Review permissions</Text>
-                    </Button>
-                </View>
             </View>
         )
     }
@@ -454,10 +864,10 @@ function DetailContent({
             >
                 <Card.Content style={styles.sectionContent}>
                     <Text style={styles.sectionTitle}>Password Protection</Text>
-                    {[
-                        { label: 'Current status', value: 'Strong password enabled' },
-                        { label: 'Last updated', value: '14 days ago' },
-                        { label: 'Recommended action', value: 'Rotate every 90 days' },
+                    {[ 
+                        { label: 'Current status', value: 'Managed by Supabase Auth' },
+                        { label: 'Recommended flow', value: 'Use reset password screen' },
+                        { label: 'Availability', value: 'Change password not wired here yet' },
                     ].map((item) => (
                         <View key={item.label} style={styles.detailRow}>
                             <Text style={[styles.detailLabel, { color: palette.mutedText }]}>
@@ -474,7 +884,7 @@ function DetailContent({
                 onPress={() =>
                     Alert.alert(
                         'Password',
-                        'Password change flow can be connected here next.'
+                        'Use the existing Supabase password recovery flow for now.'
                     )
                 }
             >
@@ -485,9 +895,11 @@ function DetailContent({
 }
 
 export function ProfileModals({
+    authUserId,
     bodyMassIndex,
     displayName,
     goals,
+    memberSinceLabel,
     notificationPreferences,
     onBackToSettings,
     onCloseDetail,
@@ -495,6 +907,8 @@ export function ProfileModals({
     onCloseSubscription,
     onOpenSetting,
     onOpenSubscription,
+    onSaveBodyData,
+    onSavePersonalInfo,
     onToggleNotification,
     onTogglePrivacy,
     palette,
@@ -803,10 +1217,14 @@ export function ProfileModals({
                         style={styles.modalScroll}
                     >
                         <DetailContent
+                            authUserId={authUserId}
                             bodyMassIndex={bodyMassIndex}
                             displayName={displayName}
                             goals={goals}
+                            memberSinceLabel={memberSinceLabel}
                             notificationPreferences={notificationPreferences}
+                            onSaveBodyData={onSaveBodyData}
+                            onSavePersonalInfo={onSavePersonalInfo}
                             onToggleNotification={onToggleNotification}
                             onTogglePrivacy={onTogglePrivacy}
                             palette={palette}
