@@ -26,41 +26,13 @@ export const authSharedStyles = StyleSheet.create({
         marginBottom: 14,
         textAlign: 'center',
     },
-    codeFusedButton: {
-        alignSelf: 'stretch',
-        borderRadius: 0,
-        justifyContent: 'center',
-        margin: 0,
-        maxWidth: 118,
-        minWidth: 100,
+    codeActionButton: {
+        borderRadius: 14,
+        marginTop: -2,
     },
-    codeFusedButtonContent: {
-        paddingHorizontal: 10,
-        paddingVertical: 0,
-    },
-    codeFusedButtonLabel: {
-        fontSize: 13,
+    codeActionButtonLabel: {
+        fontSize: 14,
         fontWeight: '600',
-        marginVertical: 0,
-    },
-    codeFusedDivider: {
-        alignSelf: 'stretch',
-        width: 1,
-    },
-    codeFusedInput: {
-        flex: 1,
-        margin: 0,
-        minHeight: 0,
-        minWidth: 0,
-    },
-    codeFusedShell: {
-        alignItems: 'stretch',
-        borderRadius: 12,
-        borderWidth: 1,
-        flexDirection: 'row',
-        marginTop: 4,
-        minHeight: 56,
-        overflow: 'hidden',
     },
     cursor: {
         color: AUTH_PRIMARY_BUTTON,
@@ -193,10 +165,6 @@ export const authSharedStyles = StyleSheet.create({
 export function useAuthScreenTheme(theme: MD3Theme) {
     return useMemo(
         () => ({
-            codeFusedBg: { backgroundColor: theme.colors.surface },
-            codeFusedBorder: { borderColor: theme.colors.outline },
-            codeFusedDivider: { backgroundColor: theme.colors.outline },
-            codeFusedInputTransparent: { backgroundColor: 'transparent' },
             errorBox: { backgroundColor: theme.colors.errorContainer },
             errorText: { color: theme.colors.onErrorContainer },
             formCard: { backgroundColor: theme.colors.surface },
@@ -212,7 +180,6 @@ export function useAuthScreenTheme(theme: MD3Theme) {
             theme.colors.onErrorContainer,
             theme.colors.onSecondaryContainer,
             theme.colors.onSurfaceVariant,
-            theme.colors.outline,
             theme.colors.primary,
             theme.colors.secondaryContainer,
             theme.colors.surface,

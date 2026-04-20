@@ -142,18 +142,26 @@ function formatMealTimeLabel(raw: string | null | undefined): string {
     const value = String(raw ?? '').trim()
     if (!value) return '—'
 
-    // 后端若返回不带时区的时间（如 "YYYY-MM-DD HH:mm:ss" / "YYYY-MM-DDTHH:mm:ss"），
-    // 实际常表示 UTC；这里显式补 "Z" 后再转本地，避免把 UTC 当成本地时间显示。
-    const hasTimezone =
-        /[zZ]$/.test(value) || /[+-]\d{2}:\d{2}$/.test(value)
-    const normalizedCore = /^\d{4}-\d{2}-\d{2}\s/.test(value)
+    // 无时区信息时，按后端给的“本地时分”直接展示，避免前端二次换算。
+    const hhmm = /(?:T|\s)(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(value)
+    const hasTimezone = /[zZ]$/.test(value) || /[+-]\d{2}:\d{2}$/.test(value)
+    if (!hasTimezone && hhmm) {
+        const h = Number(hhmm[1])
+        const mm = hhmm[2]
+        if (Number.isFinite(h) && h >= 0 && h <= 23) {
+            return `${String(h).padStart(2, '0')}:${mm}`
+        }
+    }
+
+    // 带时区时再交给 Date 做转换（如 2026-04-20T07:05:09Z）。
+    const normalized = /^\d{4}-\d{2}-\d{2}\s/.test(value)
         ? value.replace(' ', 'T')
         : value
-    const normalized = hasTimezone ? normalizedCore : `${normalizedCore}Z`
     const dt = new Date(normalized)
     if (!Number.isNaN(dt.getTime())) {
         return dt.toLocaleTimeString('en-US', {
-            hour: 'numeric',
+            hour: '2-digit',
+            hour12: false,
             minute: '2-digit',
         })
     }
@@ -164,9 +172,7 @@ function formatMealTimeLabel(raw: string | null | undefined): string {
     const h = Number(m[1])
     const mm = m[2]
     if (!Number.isFinite(h) || h < 0 || h > 23) return `${m[1]}:${mm}`
-    const hour12 = h % 12 === 0 ? 12 : h % 12
-    const suffix = h >= 12 ? 'PM' : 'AM'
-    return `${hour12}:${mm} ${suffix}`
+    return `${String(h).padStart(2, '0')}:${mm}`
 }
 
 function todayItemToMeal(log: TodayFoodLogItemDto): MealItem {

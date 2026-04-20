@@ -110,12 +110,12 @@ export function ForgotPasswordScreen({ navigation }: Props) {
 
     const getCodeLabel = () => {
         if (sending) {
-            return '…'
+            return 'Sending...'
         }
         if (isCoolingDown) {
-            return `${secondsRemaining}s`
+            return `Resend (${secondsRemaining}s)`
         }
-        return codeSent ? 'Resend' : 'Get code'
+        return codeSent ? 'Resend code' : 'Get code'
     }
 
     const getCodeDisabled = sending || isCoolingDown
@@ -208,58 +208,36 @@ export function ForgotPasswordScreen({ navigation }: Props) {
                         textContentType="emailAddress"
                         value={email}
                     />
-                    <HelperText
-                        type="error"
-                        visible={emailTouched && !emailValid && !codeSent}
-                    >
-                        <Text>Please enter a valid email</Text>
-                    </HelperText>
+                    {emailTouched && !emailValid && !codeSent ? (
+                        <HelperText type="error" visible>
+                            <Text>Please enter a valid email</Text>
+                        </HelperText>
+                    ) : null}
 
-                    <View
-                        style={[
-                            authSharedStyles.codeFusedShell,
-                            themed.codeFusedBorder,
-                            themed.codeFusedBg,
-                        ]}
+                    <TextInput
+                        autoCapitalize="none"
+                        autoComplete="one-time-code"
+                        keyboardType="number-pad"
+                        label="Code"
+                        left={<TextInput.Icon icon="numeric" />}
+                        mode="outlined"
+                        onChangeText={setOtp}
+                        style={authSharedStyles.input}
+                        textContentType="oneTimeCode"
+                        value={otp}
+                    />
+                    <Button
+                        buttonColor={AUTH_PRIMARY_BUTTON}
+                        disabled={getCodeDisabled}
+                        labelStyle={authSharedStyles.codeActionButtonLabel}
+                        loading={sending}
+                        mode="contained"
+                        onPress={() => void onGetCode()}
+                        style={authSharedStyles.codeActionButton}
+                        textColor="#FFFFFF"
                     >
-                        <TextInput
-                            activeUnderlineColor="transparent"
-                            autoCapitalize="none"
-                            autoComplete="one-time-code"
-                            dense
-                            keyboardType="number-pad"
-                            label="Code"
-                            left={<TextInput.Icon icon="numeric" />}
-                            mode="flat"
-                            onChangeText={setOtp}
-                            style={[
-                                authSharedStyles.codeFusedInput,
-                                themed.codeFusedInputTransparent,
-                            ]}
-                            textContentType="oneTimeCode"
-                            underlineColor="transparent"
-                            value={otp}
-                        />
-                        <View
-                            style={[
-                                authSharedStyles.codeFusedDivider,
-                                themed.codeFusedDivider,
-                            ]}
-                        />
-                        <Button
-                            buttonColor={AUTH_PRIMARY_BUTTON}
-                            contentStyle={authSharedStyles.codeFusedButtonContent}
-                            disabled={getCodeDisabled}
-                            labelStyle={authSharedStyles.codeFusedButtonLabel}
-                            loading={sending}
-                            mode="contained"
-                            onPress={() => void onGetCode()}
-                            style={authSharedStyles.codeFusedButton}
-                            textColor="#FFFFFF"
-                        >
-                            {getCodeLabel()}
-                        </Button>
-                    </View>
+                        {getCodeLabel()}
+                    </Button>
 
                     {codeSent ? (
                         <Button
