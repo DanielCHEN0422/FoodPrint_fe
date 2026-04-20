@@ -92,6 +92,8 @@ export interface TodayFoodLogItemDto {
 export interface FoodLogDto {
     id: string
     userId: string
+    /** 餐次时间（前端保存时传入） */
+    mealTime?: string
     /** 后端当前返回的记账日期 */
     logDate?: string
     /** 用户输入 / AI 识别的原文 */

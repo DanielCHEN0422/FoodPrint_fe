@@ -114,23 +114,68 @@ function fileNameForPickerAsset(asset: ImagePickerAsset): string {
     return 'photo.jpg'
 }
 
+function nowPacificLocalDateTime(): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).formatToParts(new Date())
+
+    const get = (type: Intl.DateTimeFormatPartTypes) =>
+        parts.find((p) => p.type === type)?.value ?? ''
+
+    const yyyy = get('year')
+    const mm = get('month')
+    const dd = get('day')
+    const hh = get('hour')
+    const mi = get('minute')
+    const ss = get('second')
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`
+}
+
+function formatMealTimeLabel(raw: string | null | undefined): string {
+    const value = String(raw ?? '').trim()
+    if (!value) return '—'
+
+    // 后端若返回不带时区的时间（如 "YYYY-MM-DD HH:mm:ss" / "YYYY-MM-DDTHH:mm:ss"），
+    // 实际常表示 UTC；这里显式补 "Z" 后再转本地，避免把 UTC 当成本地时间显示。
+    const hasTimezone =
+        /[zZ]$/.test(value) || /[+-]\d{2}:\d{2}$/.test(value)
+    const normalizedCore = /^\d{4}-\d{2}-\d{2}\s/.test(value)
+        ? value.replace(' ', 'T')
+        : value
+    const normalized = hasTimezone ? normalizedCore : `${normalizedCore}Z`
+    const dt = new Date(normalized)
+    if (!Number.isNaN(dt.getTime())) {
+        return dt.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+        })
+    }
+
+    // 兜底：直接从字符串提取 HH:mm
+    const m = /(\d{1,2}):(\d{2})/.exec(value)
+    if (!m) return '—'
+    const h = Number(m[1])
+    const mm = m[2]
+    if (!Number.isFinite(h) || h < 0 || h > 23) return `${m[1]}:${mm}`
+    const hour12 = h % 12 === 0 ? 12 : h % 12
+    const suffix = h >= 12 ? 'PM' : 'AM'
+    return `${hour12}:${mm} ${suffix}`
+}
+
 function todayItemToMeal(log: TodayFoodLogItemDto): MealItem {
     const nameSrc =
         (log.title && log.title.trim()) ||
         (log.foodItems?.filter(Boolean).join(', ') ?? '')
     const name = nameSrc.length > 0 ? nameSrc : 'Food entry'
 
-    let time = ''
-    if (log.mealTime) {
-        try {
-            time = new Date(log.mealTime).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-            })
-        } catch {
-            time = ''
-        }
-    }
+    const time = formatMealTimeLabel(log.mealTime)
 
     const short = name.length > 80 ? `${name.slice(0, 77)}...` : name
     const cal = Number(log.totalCalories)
@@ -138,7 +183,7 @@ function todayItemToMeal(log: TodayFoodLogItemDto): MealItem {
         id: log.id,
         name: short,
         mealType: 'Logged',
-        time: time || '—',
+        time,
         calories: Number.isFinite(cal) ? Math.round(cal) : undefined,
         icon: 'silverware-fork-knife',
     }
@@ -216,7 +261,11 @@ function foodLogDtoToTodayItem(log: FoodLogDto): TodayFoodLogItemDto {
         title: title || 'Meal',
         foodItems,
         totalCalories,
-        mealTime: log.createdAt ?? new Date().toISOString(),
+        mealTime:
+            log.mealTime ??
+            log.createdAt ??
+            log.logDate ??
+            new Date().toISOString(),
     }
     if (totalProtein !== undefined) out.totalProtein = totalProtein
     if (totalFat !== undefined) out.totalFat = totalFat
@@ -430,18 +479,18 @@ const ringStyles = StyleSheet.create({
     },
     // 修复46%文本真正居中 - 绝对定位文本容器
     textContainer: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
         alignItems: 'center',
+        height: '100%',
         justifyContent: 'center',
-        top: 0,
         left: 0,
+        position: 'absolute',
+        top: 0,
+        width: '100%',
     },
     percentageText: {
+        color: COLORS.dark,
         fontSize: 14,
         fontWeight: '600',
-        color: COLORS.dark,
         textAlign: 'center',
     },
 })
@@ -861,7 +910,7 @@ export function HomeScreen() {
                 const created = await createManualFoodLog(
                     {
                         title,
-                        mealTime: new Date().toISOString(),
+                        mealTime: nowPacificLocalDateTime(),
                         foods: named,
                     },
                     authUserId
@@ -885,7 +934,7 @@ export function HomeScreen() {
             const created = await saveAiAnalysisLog(
                 {
                     title,
-                    mealTime: new Date().toISOString(),
+                    mealTime: nowPacificLocalDateTime(),
                     analysisResult,
                 },
                 authUserId
@@ -1519,8 +1568,8 @@ const styles = StyleSheet.create({
     // ── Ring Container ──
     ringContainer: {
         position: 'absolute',
-        top: 20,
         right: 22,
+        top: 20,
     },
 
     // ── Macros ──
@@ -1776,8 +1825,8 @@ const styles = StyleSheet.create({
 
     // ── Modal Styles ──
     modalOverlay: {
-        flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        flex: 1,
         justifyContent: 'flex-end',
     },
     modalContainer: {
@@ -1793,12 +1842,12 @@ const styles = StyleSheet.create({
         minHeight: '72%',
     },
     modalHeader: {
+        alignItems: 'center',
+        borderBottomColor: '#F0F0F0',
+        borderBottomWidth: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
         padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     modalTitle: {
         color: COLORS.dark,
@@ -1828,12 +1877,12 @@ const styles = StyleSheet.create({
     },
     textInput: {
         backgroundColor: COLORS.bg,
-        borderRadius: 12,
-        padding: 12,
-        fontSize: 16,
-        color: COLORS.dark,
-        borderWidth: 1,
         borderColor: '#E0E0E0',
+        borderRadius: 12,
+        borderWidth: 1,
+        color: COLORS.dark,
+        fontSize: 16,
+        padding: 12,
     },
     textInputMultiline: {
         minHeight: 100,
@@ -1845,15 +1894,15 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     modalBtn: {
+        alignItems: 'center',
+        borderRadius: 12,
         flex: 1,
         paddingVertical: 14,
-        borderRadius: 12,
-        alignItems: 'center',
     },
     modalBtnCancel: {
         backgroundColor: COLORS.bg,
-        borderWidth: 1,
         borderColor: '#E0E0E0',
+        borderWidth: 1,
     },
     modalBtnSave: {
         backgroundColor: COLORS.primary,
